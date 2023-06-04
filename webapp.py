@@ -34,10 +34,16 @@ data_load_state.text("Finished!")
 st.subheader("Raw Data")
 st.write(data.tail())
 
+# TODO: add volume plot with this selector
+graphtypes = ['Candlestick Plot', 'Volume']
+graph_selector = st.selectbox("Select graph type", graphtypes)
+
+
 def plot_raw_data():
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=['Date'], y=data['Open'], name='stock_open'))
-    # fig.add_trace(go.Scatter(x=['Date'], y=data['Close'], name='stock_close'))
+    fig.add_trace(go.Candlestick(x=data['Date'], open=data['Open'], 
+                                 high=data['High'], low=data['Low'], 
+                                 close=data['Close']))
     fig.layout.update(title_text="Time Series Data", xaxis_rangeslider_visible
                        =True)
     st.plotly_chart(fig)
