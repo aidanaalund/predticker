@@ -9,6 +9,8 @@ from pandas.tseries.offsets import CustomBusinessDay
 # it means we will train the model with offline data.
 import yfinance as yf
 from plotly import graph_objs as go
+import time
+import random
 
 START = "2015-01-01"
 TODAY = date.today().strftime("%Y-%m-%d")
@@ -16,17 +18,37 @@ YEAR = date.today().strftime("%Y")
 startOfYear = "f'{YEAR}-01-01'"
 
 
-st.title("Stock Prediction App")
+st.title("Predticker - A stock prediction webapp")
+if 'stocks' not in st.session_state:
+    st.session_state.stocks = set(["AAPL", "GOOG", "MSFT", "GME"])
 
 # TODO: make the stocks a text input
-stocks = ("AAPL", "GOOG", "MSFT", "GME")
-selected_stock = st.selectbox("Select dataset for prediction", stocks)
+selected_stock = st.selectbox("Select ticker for prediction", 
+                              st.session_state.stocks,
+                              key='search_1')
+
+def addstock(newstock):    
+    st.session_state.stocks.add(newstock)
+    st.session_state.search_1 = newstock
+    
+
+newstock = st.text_input(label='Add a ticker...', 
+                         placeholder="Type a ticker and press enter to add to the list", 
+                         max_chars=4,
+                         value = 'AAPL')
+
+adder = st.button('Add stock', on_click=addstock,
+    args=(newstock, ))
+    
+    
+
+
 
 n_years = st.slider("Years of prediction:", 1, 4)
 period = n_years * 365
 
 #we can use st.cache_resource for ML models later on!
-#@st.cache_resource
+@st.cache_resource
 def load_data(ticker):
     data = yf.download(ticker,START,TODAY)
     data.reset_index(inplace=True)
@@ -77,7 +99,6 @@ volume = go.Scatter(x=data['Date'], y=data['Volume'])
 stocklayout = dict(
     
     yaxis=dict(fixedrange = False),
-    title_text="Time Series Data", 
     xaxis_rangeslider_visible = True,
     xaxis=dict(
         rangeselector=dict(
@@ -125,8 +146,12 @@ stocklayout = dict(
     )
 
 fig = go.Figure(data=candlestick, layout=stocklayout)
+fig.update_layout(title = 'Candlestick Plot')
+fig2 = go.Figure(data=volume, layout=stocklayout)
+fig2.update_layout(title = 'Volume Plot')
 
 st.plotly_chart(fig)
+st.plotly_chart(fig2)
 
 # with col1:
 #     graphtypes = ['Candlestick Plot', 'Volume']
