@@ -1,11 +1,9 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
-
 import tensorflow as tf
 from tensorflow import keras
-
+import seaborn as sns
 import os
 from datetime import datetime
  
@@ -13,85 +11,52 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-# grabs stock ticker data
-import yfinance as yf
-
-# various libraries for UI, we can use seaborn instead of plotly for now
-from plotly import graph_objs as go
-import streamlit as st
-
-# Define functions
-# creates a pandas dataframe for one given stock
-def load_data(ticker, startdate, enddate):
-    # not sure if this works?
-    data = yf.download(ticker, startdate, enddate)
-    # puts the date in the first column
-    data.reset_index(inplace=True)
-    # data is returned in a pandas dataframe
-    return data
-
-
-
-
-#eventually these methods will be defined by user input
-companies = ['NVDA']
-selected_stock = 'AAPL'
-START = "2015-01-01"
-TODAY = datetime.today().strftime("%Y-%m-%d")
-
-
-#data = pd.read_csv('all_stocks_5yr.csv')
-data = load_data(companies,START,TODAY)
+data = pd.read_csv("all_stocks_5yr.csv")
 print(data.shape)
 print(data.sample(7))
+
 data.info()
-# for debugging, this line will write a csv of the downloaded data
-#data.to_csv('dummydata.csv')
 
-# these two lines aren't needed right now
-# by default yfinance will give us the csv with dates in datetime64 format
-# therefore, code to convert date formats to the proper format is not needed
-# data['date'] = pd.to_datetime(data['date'])
-# data.info()
+data['date'] = pd.to_datetime(data['date'])
+data.info()
 
+data['date'] = pd.to_datetime(data['date'])
 # date vs open
 # date vs close
-plt.figure(figsize=(20, 12))
+companies = ['AAPL','NVDA']
+
+plt.figure(figsize=(15, 8))
 for index, company in enumerate(companies, 1):
     plt.subplot(3, 3, index)
-    plt.plot(data['Date'], data['Close'], c="r", label="close", marker="+")
-    plt.plot(data['Date'], data['Open'], c="g", label="open", marker="^")
+    c = data[data['Name'] == company]
+    plt.plot(c['date'], c['close'], c="r", label="close", marker="+")
+    plt.plot(c['date'], c['open'], c="g", label="open", marker="^")
     plt.title(company)
     plt.legend()
     plt.tight_layout()
     
+plt.figure(figsize=(15, 8))
+for index, company in enumerate(companies, 1):
+    plt.subplot(3, 3, index)
+    c = data[data['Name'] == company]
+    plt.plot(c['date'], c['volume'], c='purple', marker='*')
+    plt.title(f"{company} Volume")
+    plt.tight_layout()
     
-# plt.figure(figsize=(25, 12))
-# for index, company in enumerate(companies, 1):
-#     plt.subplot(3, 3, index)
-#     plt.plot(data['Date'], data['Volume'], c='purple', marker='*')
-#     plt.title("Volume")
-#     plt.tight_layout()
+apple = data[data['Name'] == 'AAPL']
+prediction_range = apple.loc[(apple['date'] > datetime(2013,1,1))
+ & (apple['date']<datetime(2018,1,1))]
+plt.plot(apple['date'],apple['close'])
+plt.xlabel("Date")
+plt.ylabel("Close")
+plt.title("Apple Stock Prices")
+plt.show()
 
-
-# plt.figure(figsize=(15, 8))    
-# apple = data[data['Name'] == 'AAPL']
-# prediction_range = apple.loc[(apple['date'] > datetime(2013,1,1))
-#   & (apple['date']<datetime(2018,1,1))]
-# plt.plot(apple['date'],apple['close'])
-# plt.xlabel("Date")
-# plt.ylabel("Close")
-# plt.title("Apple Stock Prices")
-# plt.show()   
-
-
-# sdataset creation
 close_data = apple.filter(['close'])
 dataset = close_data.values
 training = int(np.ceil(len(dataset) * .95))
 print(training)
 
-# preprocessing
 from sklearn.preprocessing import MinMaxScaler
  
 scaler = MinMaxScaler(feature_range=(0, 1))
