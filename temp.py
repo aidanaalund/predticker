@@ -147,6 +147,7 @@ for index, company in enumerate(companies, 1):
 # test = apple[training:]
 # test['Predictions'] = predictions
  
+<<<<<<< Updated upstream
 # plt.figure(figsize=(10, 8))
 # plt.plot(train['date'], train['close'])
 # plt.plot(test['date'], test[['close', 'Predictions']])
@@ -154,3 +155,12 @@ for index, company in enumerate(companies, 1):
 # plt.xlabel('Date')
 # plt.ylabel("Close")
 # plt.legend(['Train', 'Test', 'Predictions'])
+=======
+plt.figure(figsize=(10, 8))
+plt.plot(train['date'], train['close'])
+plt.plot(test['date'], test[['close', 'Predictions']])
+plt.title('Apple Stock Close Price')
+plt.xlabel('Date')
+plt.ylabel("Close")
+plt.legend(['Train', 'Test', 'Predictions'])
+>>>>>>> Stashed changes
