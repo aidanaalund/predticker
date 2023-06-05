@@ -1,6 +1,8 @@
 import streamlit as st
 from datetime import date, timedelta
 import pandas as pd
+from pandas.tseries.holiday import USFederalHolidayCalendar
+from pandas.tseries.offsets import CustomBusinessDay
 
 # BIG PROBLEM: we are going to get rate limited on yfinance.
 # Not only does this pose issues for the app as a data displayer, but
@@ -13,8 +15,10 @@ TODAY = date.today().strftime("%Y-%m-%d")
 YEAR = date.today().strftime("%Y")
 startOfYear = "f'{YEAR}-01-01'"
 
+
 st.title("Stock Prediction App")
 
+# TODO: make the stocks a text input
 stocks = ("AAPL", "GOOG", "MSFT", "GME")
 selected_stock = st.selectbox("Select dataset for prediction", stocks)
 
@@ -22,7 +26,7 @@ n_years = st.slider("Years of prediction:", 1, 4)
 period = n_years * 365
 
 #we can use st.cache_resource for ML models later on!
-#st.cache_resource
+#@st.cache_resource
 def load_data(ticker):
     data = yf.download(ticker,START,TODAY)
     data.reset_index(inplace=True)
@@ -32,6 +36,17 @@ def load_data(ticker):
 data_load_state = st.text("Loading data...")
 data = load_data(selected_stock)
 data_load_state.text("Finished!")
+
+# This section removes gaps in the plot by creating a list of missing dates
+# grab first and last observations from df.date and make a continuous date range from that
+dt_all = pd.date_range(start=data['Date'].iloc[0],end=data['Date'].iloc[-1], freq = 'D')
+
+# check which dates from your source that also accur in the continuous date range
+dt_obs = [d.strftime("%Y-%m-%d") for d in data['Date']]
+
+# isolate missing timestamps
+dt_breaks = [d for d in dt_all.strftime("%Y-%m-%d").tolist() if not d in dt_obs]
+
 
 st.subheader("Raw Data")
 st.write(data.tail())
@@ -51,61 +66,67 @@ st.write(data.tail())
 # buttons = []
 
 
-def plot_raw_data():
-    fig = go.Figure()
-    fig.add_trace(go.Candlestick(x=data['Date'], open=data['Open'], 
-                                 high=data['High'], low=data['Low'], 
-                                 close=data['Close']))
-    fig.layout.update(title_text="Time Series Data", xaxis_rangeslider_visible
-                       =True)
+# define the plot types and the default layout to them
+
+candlestick = go.Candlestick(x=data['Date'], open=data['Open'], 
+                             high=data['High'], low=data['Low'], 
+                             close=data['Close'])
+
+volume = go.Scatter(x=data['Date'], y=data['Volume'])
+
+stocklayout = dict(
     
-    fig.update_layout(
-        xaxis=dict(
-            rangeselector=dict(
-                buttons=list([
-                    dict(count=1,
-                         label="1D",
-                         step="day",
-                         stepmode="backward"),
-                    dict(count=7,
-                         label="1W",
-                         step="day",
-                         stepmode="backward"),
-                    dict(count=1,
-                         label="1M",
-                         step="month",
-                         stepmode="backward"),
-                    dict(count=6,
-                         label="6M",
-                         step="month",
-                         stepmode="backward"),
-                    dict(count=1,
-                         label="YTD",
-                         step="year",
-                         stepmode="todate"),
-                    dict(count=1,
-                         label="1Y",
-                         step="year",
-                         stepmode="backward"),
-                    dict(count=5,
-                         label="5Y",
-                         step="year",
-                         stepmode="backward"),
-                    dict(step="all")
-                    ])
-                ),
-            rangeslider=dict(
-                visible=True
-                ),
-            type="date"
-            )
+    yaxis=dict(fixedrange = False),
+    title_text="Time Series Data", 
+    xaxis_rangeslider_visible = True,
+    xaxis=dict(
+        rangeselector=dict(
+            buttons=list([
+                dict(count=1,
+                     label="1D",
+                     step="day",
+                     stepmode="backward"),
+                dict(count=7,
+                     label="1W",
+                     step="day",
+                     stepmode="backward"),
+                dict(count=1,
+                     label="1M",
+                     step="month",
+                     stepmode="backward"),
+                dict(count=6,
+                     label="6M",
+                     step="month",
+                     stepmode="backward"),
+                dict(count=1,
+                     label="YTD",
+                     step="year",
+                     stepmode="todate"),
+                dict(count=1,
+                     label="1Y",
+                     step="year",
+                     stepmode="backward"),
+                dict(count=5,
+                     label="5Y",
+                     step="year",
+                     stepmode="backward"),
+                dict(step="all")
+                ])
+            ),
+        rangeslider=dict(
+            visible=False
+            ),
+        type="date",
+        rangebreaks=[
+        dict(bounds=["sat", "mon"]), #hide weekends
+        dict(values=dt_breaks)
+        ]
+        ) 
     )
-        
-    st.plotly_chart(fig)
-   
 
+fig = go.Figure(data=candlestick, layout=stocklayout)
 
-plot_raw_data()
+st.plotly_chart(fig)
 
 # with col1:
 #     graphtypes = ['Candlestick Plot', 'Volume']
