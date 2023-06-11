@@ -19,7 +19,7 @@ from keras.models import Sequential
 from keras.layers import Dense, LSTM, Dropout
 from collections import deque
 
-START = "2018-01-01"
+START = "2022-01-01"
 TODAY = date.today().strftime("%Y-%m-%d")
 YEAR = date.today().strftime("%Y")
 startOfYear = "f'{YEAR}-01-01'"
@@ -29,10 +29,9 @@ startOfYear = "f'{YEAR}-01-01'"
 # <style>
 # div.stButton > button:first-child {
 #     border: 2px solid rgba(221, 199, 237);
-#     background-color: rgb(255, 255, 255);
-    
-# }
-# </style>""", unsafe_allow_html=True)
+#     background-color: rgb(255, 255, 255);   
+# # }
+# # </style>""", unsafe_allow_html=True)
 
 
 # color1 = st.color_picker('选择渐变起始颜色', '#1aa3ff',key=1)
@@ -42,8 +41,13 @@ startOfYear = "f'{YEAR}-01-01'"
 # st.markdown(f'<p style="text-align:center;background-image: linear-gradient(to right,{color1}, {color2});color:{color3};font-size:24px;border-radius:2%;">{content}</p>', unsafe_allow_html=True)
 # title, emoji, sub = st.columns([2,2,3])
 # with title:
-st.title("Predticker:crystal_ball:")
-st.subheader("A magic stock predictor & dashboard")
+title, loadingtext = st.columns([1,1])
+with title:
+   st.title("Predticker:crystal_ball:")
+# with loadingtext:
+#     #data_load_state = st.markdown("(_Loading data..._)")
+
+st.subheader("A magic stock predictor & dashboard") 
     
 if 'stocks' not in st.session_state:
     st.session_state.stocks = set(["AAPL", "GOOG", "MSFT", "GME"])
@@ -52,21 +56,22 @@ if 'predictiontext' not in st.session_state:
     st.session_state.predictiontext = ''
 
 # User Input
-selected_stock = st.selectbox("Select ticker to display", 
-                              st.session_state.stocks,
-                              key='search_1')
-col1, col2 = st.columns([6,1])
+col1, col2, col3 = st.columns([6,3,3])
 
 def addstock(newstock):    
     st.session_state.stocks.add(newstock)
     st.session_state.search_1 = newstock
-    
+
 with col1:
+    selected_stock = st.selectbox("Select ticker to display", 
+                                  st.session_state.stocks,
+                                  key='search_1')
+with col2:
     newstock = st.text_input(label='Add a ticker...', 
                          placeholder="Type a ticker and press enter to add to the list", 
                          max_chars=4,
                          value = 'AAPL')
-with col2:
+with col3:
     st.write('')
     st.write('')
     adder = st.button('Add stock', on_click=addstock,
@@ -82,11 +87,9 @@ def load_data(ticker):
     st.session_state.currentdataframe = data
     return data
 
-#TODO: Should the finished text persist for a bit? Nah.
-data_load_state = st.text("Loading data...")
 data = load_data(selected_stock)
-data_load_state.text("Finished!")
-data_load_state.empty()
+# data_load_state.text("_Finished!_")
+# data_load_state.empty()
 
 if 'currentdataframe' not in st.session_state:
     #make this set to what the selector is currently set to
@@ -107,7 +110,7 @@ dt_breaks = [d for d in dt_all.strftime("%Y-%m-%d").tolist() if not d in dt_obs]
 #st.write(data.tail())
 
 #TODO: determine if our model is even worth anything...
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def predict(stockdataframe):
     
     # To put the data set in the correct form for training, 'Prepare_Data' function is implemented
@@ -204,17 +207,25 @@ def predict(stockdataframe):
 
 
 # PREDICTION UI
-col3, col4 = st.columns([7,2])
+col3, col4, col5 = st.columns([6,3,3])
 with col3:
     n_years = st.slider(label="Select how many days ahead you'd like to predict the closing price:", 
                         min_value = 1, 
                         max_value = 4)
 with col4:
     st.write('')
-    # st.write('')
-    adder = st.button(f'Predict **{n_years}** day(s) ahead... :male_mage:', on_click = predict, 
-                      args = (st.session_state.currentdataframe, ))
+    st.write('')
+    adder = st.button(f'Predict **{n_years}** day(s) ahead... :male_mage:')
+with col5:
+    if adder:
+        st.write('')
+        st.write('')
+        st.write('')
+        with st.spinner('Predicting...'):
+            predict(st.session_state.currentdataframe)
     
+#TODO: make this into some kind of popup? Right now it is '' before predicting
+# This takes up valuable screen space   
 prediction = st.write(st.session_state.predictiontext)
 
 
@@ -222,7 +233,9 @@ prediction = st.write(st.session_state.predictiontext)
 # Define the plot types and the default layout to them
 candlestick = go.Candlestick(x=data['Date'], open=data['Open'], 
                              high=data['High'], low=data['Low'], 
-                             close=data['Close'])
+                             close=data['Close'],
+                             increasing_line_color= '#2ca02c', 
+                             decreasing_line_color= '#ff4b4b')
 
 volume = go.Scatter(x=data['Date'], y=data['Volume'])
 
@@ -273,11 +286,14 @@ stocklayout = dict(
 
 # Display candlestick and volume plots
 fig = go.Figure(data=candlestick, layout=stocklayout)
-fig.update_layout(title = 'Candlestick Plot')
+fig.update_layout(title = 'Candlestick Plot', yaxis_title='Share Price ($)')
 fig2 = go.Figure(data=volume, layout=stocklayout)
-fig2.update_layout(title = 'Volume Plot')
+fig2.update_layout(title = 'Volume Plot',yaxis_title='Number of Shares')
 
-#TODO: make this into a container
-#st.write("***Historical Data***")
-st.plotly_chart(fig)
-st.plotly_chart(fig2)
+plotcontainer = st.container()
+volume, candle = plotcontainer.columns([4,4])
+#TODO: have some statistics like the google dashboard.
+with volume:
+    plotcontainer.plotly_chart(fig)
+with candle:
+    plotcontainer.plotly_chart(fig2)
