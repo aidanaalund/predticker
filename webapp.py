@@ -4,30 +4,58 @@ import pandas as pd
 from pandas.tseries.holiday import USFederalHolidayCalendar
 from pandas.tseries.offsets import CustomBusinessDay
 
-# BIG PROBLEM: we are going to get rate limited on yfinance.
-# Not only does this pose issues for the app as a data displayer, but
-# it means we will train the model with offline data.
+
 import yfinance as yf
 from plotly import graph_objs as go
 import time
 import random
+import numpy as np
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
-START = "2015-01-01"
+from sklearn.preprocessing import RobustScaler
+import tensorflow as tf
+from keras.models import Sequential
+from keras.layers import Dense, LSTM, Dropout
+from collections import deque
+
+START = "2018-01-01"
 TODAY = date.today().strftime("%Y-%m-%d")
 YEAR = date.today().strftime("%Y")
 startOfYear = "f'{YEAR}-01-01'"
 
+# A markdown hack that makes things look cooler
+# m = st.markdown("""
+# <style>
+# div.stButton > button:first-child {
+#     border: 2px solid rgba(221, 199, 237);
+#     background-color: rgb(255, 255, 255);
+    
+# }
+# </style>""", unsafe_allow_html=True)
 
-st.title("Predticker - A stock prediction webapp")
+
+# color1 = st.color_picker('选择渐变起始颜色', '#1aa3ff',key=1)
+# color2 = st.color_picker('选择渐变结尾颜色', '#00ff00',key=2)
+# color3 = st.color_picker('选择文字颜色', '#ffffff',key=3)
+# content = "Predticker - A magic stock predictor! :crystal_ball:"
+# st.markdown(f'<p style="text-align:center;background-image: linear-gradient(to right,{color1}, {color2});color:{color3};font-size:24px;border-radius:2%;">{content}</p>', unsafe_allow_html=True)
+# title, emoji, sub = st.columns([2,2,3])
+# with title:
+st.title("Predticker:crystal_ball:")
+st.subheader("A magic stock predictor & dashboard")
+    
 if 'stocks' not in st.session_state:
     st.session_state.stocks = set(["AAPL", "GOOG", "MSFT", "GME"])
+if 'predictiontext' not in st.session_state:
+    #make this set to what the selector is currently set to
+    st.session_state.predictiontext = ''
 
 # User Input
-
-selected_stock = st.selectbox("Select ticker for prediction", 
+selected_stock = st.selectbox("Select ticker to display", 
                               st.session_state.stocks,
                               key='search_1')
-col1, col2 = st.columns([3,1])
+col1, col2 = st.columns([6,1])
 
 def addstock(newstock):    
     st.session_state.stocks.add(newstock)
@@ -51,11 +79,18 @@ def load_data(ticker):
     data = yf.download(ticker,START,TODAY)
     data.reset_index(inplace=True)
     data['Date'] = pd.to_datetime(data['Date'])
+    st.session_state.currentdataframe = data
     return data
 
+#TODO: Should the finished text persist for a bit? Nah.
 data_load_state = st.text("Loading data...")
 data = load_data(selected_stock)
 data_load_state.text("Finished!")
+data_load_state.empty()
+
+if 'currentdataframe' not in st.session_state:
+    #make this set to what the selector is currently set to
+    st.session_state.currentdataframe = data
 
 # Data preprocessing
 # grab first and last observations from df.date and make a continuous date range from that
@@ -71,16 +106,117 @@ dt_breaks = [d for d in dt_all.strftime("%Y-%m-%d").tolist() if not d in dt_obs]
 #st.subheader("Raw Data")
 #st.write(data.tail())
 
-#TODO: machine learning goes here :)
-col3, col4 = st.columns([3,1])
-with col3:
-    n_years = st.slider("Years of prediction:", 1, 4)
+#TODO: determine if our model is even worth anything...
+@st.cache_resource
+def predict(stockdataframe):
     
-period = n_years * 365
+    # To put the data set in the correct form for training, 'Prepare_Data' function is implemented
+    def Prepare_Data(dataframe, days):
+
+      df = dataframe.copy()
+      df['future'] = df['scaled_close'].shift(-days)
+      last_sequence = np.array(df[['scaled_close']].tail(days))
+      df.dropna(inplace=True)
+      
+      sequence_data = []
+      sequences = deque(maxlen=NUMBER_of_STEPS_BACK)
+
+      for entry, target in zip(df[['scaled_close','Date']].values, df['future'].values):
+          sequences.append(entry)
+          if len(sequences) == NUMBER_of_STEPS_BACK:
+              sequence_data.append([np.array(sequences), target])
+
+      last_sequence = list([s[:1] for s in sequences]) + list(last_sequence)
+      last_sequence = np.array(last_sequence).astype(np.float32)
+
+      # build X and Y training set
+      X, Y = [], []
+      for seq, target in sequence_data:
+          X.append(seq)
+          Y.append(target)
+
+      # convert X and Y to numpy arrays for compatibility
+      X = np.array(X)
+      Y = np.array(Y)
+
+      return last_sequence, X, Y
+
+    # To train the one-of-a-kind LSTM model with set hyperparameters, 'Train_Model' function is implemented
+    def Train_Model(x_train, y_train, NUMBER_of_STEPS_BACK, BATCH_SIZE, UNITS, EPOCHS, DROPOUT, OPTIMIZER, LOSS):
+
+      model = Sequential()
+
+      model.add(LSTM(UNITS, return_sequences=True, input_shape=(NUMBER_of_STEPS_BACK, 1)))
+      model.add(Dropout(DROPOUT))
+      model.add(LSTM(UNITS, return_sequences=False))
+      model.add(Dropout(DROPOUT))
+      model.add(Dense(1)) # Makes sure that for each day, there is only one prediction
+
+      model.compile(loss=LOSS, optimizer=OPTIMIZER)
+
+      model.fit(x_train, y_train, epochs=EPOCHS, batch_size=BATCH_SIZE, verbose=1)
+
+      model.summary()
+
+      return model
+
+    # Check for a null input
+    if st.session_state.predictiontext == '':
+        st.session_state.predictiontext = 'Please input the stock again!'  
+        
+
+    #take the dataframe, chop it the amount back specified internally
+    NUMBER_of_STEPS_BACK = 7 # Number of days back that the model will be trained for
+    #TODO: allow PREDICTION_STEPS to be modified based on the slider.
+    #There is some kind of method built in with range() to do this
+    PREDICTION_STEPS = [1] # Number of days that the model will predict. To predict the next three days, modify it as follows: [1,2,3]
+    BATCH_SIZE = 16 # Number of training samples that will be passed to the network in one epoch
+    DROPOUT = 0.25 # Probability to exclude the input and recurrent connections to improve performance by regularization (25%)
+    UNITS = 60 # Number of neurons connected to the layer
+    EPOCHS = 15 # Number of times that the learning algorithm will work through the entire training set 
+    LOSS='mean_squared_error' # Methodology to measure the inaccuracy
+    OPTIMIZER='adam' # Optimizer used to iterate to better states
+    scaler = RobustScaler()
+    stockdataframe['scaled_close'] = scaler.fit_transform(np.expand_dims(stockdataframe['Close'].values, axis=1))
+    
+    predictions = []
+
+    for step in PREDICTION_STEPS:
+      last_sequence, x_train, y_train = Prepare_Data(stockdataframe, step)
+      x_train = x_train[:, :, :1].astype(np.float32)
+
+      model = Train_Model(x_train, y_train, NUMBER_of_STEPS_BACK, BATCH_SIZE, UNITS, EPOCHS, DROPOUT, OPTIMIZER, LOSS)
+      
+      last_sequence = last_sequence[-NUMBER_of_STEPS_BACK:]
+      last_sequence = np.expand_dims(last_sequence, axis=0)
+      prediction = model.predict(last_sequence)
+      predicted_price = scaler.inverse_transform(prediction)[0][0]
+
+      predictions.append(round(float(predicted_price), 2))
+      
+    # Print Prediction
+    if len(predictions) > 0:
+      predictions_list = [str(d)+'$' for d in predictions]
+      predictions_str = ', '.join(predictions_list)
+      message = f":sparkles: {selected_stock}'s share price prediction for the next day(s) is {predictions_str} :sparkles:"
+      st.session_state.predictiontext = message
+          
+
+
+# PREDICTION UI
+col3, col4 = st.columns([7,2])
+with col3:
+    n_years = st.slider(label="Select how many days ahead you'd like to predict the closing price:", 
+                        min_value = 1, 
+                        max_value = 4)
 with col4:
     st.write('')
-    st.write('')
-    adder = st.button('Predict... :male_mage:')
+    # st.write('')
+    adder = st.button(f'Predict **{n_years}** day(s) ahead... :male_mage:', on_click = predict, 
+                      args = (st.session_state.currentdataframe, ))
+    
+prediction = st.write(st.session_state.predictiontext)
+
 
 
 # Define the plot types and the default layout to them
@@ -128,21 +264,20 @@ stocklayout = dict(
                 dict(step="all")
                 ])
             ),
-        rangeslider=dict(
-            visible=False
-            ),
-        type="date",
         rangebreaks=[
         dict(bounds=["sat", "mon"]), #hide weekends
         dict(values=dt_breaks)
         ]
-        ) 
+        )
     )
+
 # Display candlestick and volume plots
 fig = go.Figure(data=candlestick, layout=stocklayout)
 fig.update_layout(title = 'Candlestick Plot')
 fig2 = go.Figure(data=volume, layout=stocklayout)
 fig2.update_layout(title = 'Volume Plot')
 
+#TODO: make this into a container
+#st.write("***Historical Data***")
 st.plotly_chart(fig)
 st.plotly_chart(fig2)
