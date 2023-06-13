@@ -4,6 +4,7 @@ from datetime import datetime
 import datetime
 
 import streamlit as st
+from streamlit_extras.stateful_button import button as sbutton
 
 import pandas as pd
 # from pandas.tseries.holiday import USFederalHolidayCalendar
@@ -36,16 +37,15 @@ if 'predictiontext' not in st.session_state:
     st.session_state.predictiontext = ''
 if 'stocktoadd' not in st.session_state:
     st.session_state.stocktoadd = ''
+if 'currentlayoutbutton' not in st.session_state:
+    st.session_state.currentlayoutbutton = None
+if 'predictionary' not in st.session_state:
+    st.session_state.predictionary = {}
 
 # User Input
 col1, col2, col3 = st.columns([6, 3, 3])
 
-# def addstock2(newstock):
-#     if newstock != '':
-#         st.session_state.stocks.add(newstock)
-#         st.session_state.search_1 = newstock
-
-# TODO: refactor to check if input is a real ticker and remove addstock()
+# Callback that adds an inputted stock string to a list of stocks in the state
 
 
 def addstock():
@@ -68,11 +68,13 @@ with col2:
 # with col3:
 #     st.write('')
 #     st.write('')
-#     adder = st.button('Add stock', on_click=addstock2,
+#     adder = st.button('Add stock', on_click=addstock,
 #                  args=(newstock, ))
 
 
-# Load correctly formatted data
+# Load correctly formatted data in a pandas dataframe
+
+
 @st.cache_data(show_spinner=False)
 def load_data(ticker):
     data = yf.download(ticker, START, TODAY)
@@ -101,10 +103,12 @@ dt_breaks = [d for d in dt_all.strftime(
 # For debugging, this will display the last 5 rows of our dataframe
 # st.subheader("Raw Data")
 # st.write(data.tail())
-# TODO: determine if our model is even worth anything...
+
+# Returns a predicted price for a stock using an LSTM
+# Caching this seemed to cause a bug? Check this later...
+# @st.cache_resource(show_spinner=False)
 
 
-@st.cache_resource(show_spinner=False)
 def predict(stockdataframe):
 
     # TODO: start a timer that gives some info on how long it took to predict?
@@ -202,8 +206,7 @@ def predict(stockdataframe):
     if len(predictions) > 0:
         predictions_list = [str(d)+'$' for d in predictions]
         predictions_str = ', '.join(predictions_list)
-        message = f":sparkles: {selected_stock}'s closing price prediction(s): {predictions_str} :sparkles:"
-        st.session_state.predictiontext = message
+        st.session_state.predictionary[f'{selected_stock}'] = predictions_str
 
 
 # PREDICTION UI
@@ -211,7 +214,7 @@ col3, col4, col5 = st.columns([6, 3, 3])
 with col3:
     n_years = st.slider(label="Select how many days ahead you'd like to predict the closing price:",
                         min_value=1,
-                        max_value=10)
+                        max_value=5)
 with col4:
     st.write('')
     st.write('')
@@ -230,15 +233,17 @@ candlestick = go.Candlestick(x=data['Date'], open=data['Open'],
                              high=data['High'], low=data['Low'],
                              close=data['Close'],
                              increasing_line_color='#2ca02c',
-                             decreasing_line_color='#ff4b4b')
+                             decreasing_line_color='#ff4b4b',
+                             hoverinfo=None)
 
 volume = go.Scatter(x=data['Date'], y=data['Volume'])
+
+# Computes a scaled view for both plots based on the view mode and data
+# Returned as an x range and two y ranges for each plot
 
 
 @st.cache_data
 def defaultRanges(df, period):
-
-    bf = 30
 
     match period:
         case '1W':
@@ -252,6 +257,7 @@ def defaultRanges(df, period):
         case '5Y':
             bf = 365*5
         case 'YTD':
+            # TODO: the issue is that the first day of the year is new year's
             firstday = datetime.datetime(YEAR, 1, 1)
             x = [firstday, df['Date'].iloc[-1]]
             ymax = df['High'].max()
@@ -262,7 +268,6 @@ def defaultRanges(df, period):
             yvolume = [df['Volume'].min(), df['Volume'].max()]
             return x, ycandle, yvolume
         case 'Max':
-            # TODO: the issue is that the first day of the year is new year's
             x = [df['Date'].iloc[0], df['Date'].iloc[-1]]
             ymax = df['High'].max()
             ymin = df['Low'].min()
@@ -271,6 +276,8 @@ def defaultRanges(df, period):
                        ymax+cbuffer]
             yvolume = [df['Volume'].min(), df['Volume'].max()]
             return x, ycandle, yvolume
+        case _:
+            bf = 30
 
     lower = df['Date'].iloc[-1]-np.timedelta64(bf, 'D')
 
@@ -315,6 +322,21 @@ fig.update_layout(title='',
                   yaxis_title='Share Price ($)',
                   yaxis_range=placeholderYRange,
                   xaxis_range=placeholderXRange,
+                  modebar_remove=["autoScale2d", "autoscale", "editInChartStudio",
+                                  "editinchartstudio", "hoverCompareCartesian",
+                                  "hovercompare", "lasso", "lasso2d",
+                                  "orbitRotation", "orbitrotation", "pan3d",
+                                  "resetCameraDefault3d", "resetCameraLastSave3d",
+                                  "resetGeo", "resetSankeyGroup", "resetScale2d",
+                                  "resetViewMapbox", "resetViews", "resetcameradefault",
+                                  "resetcameralastsave", "resetsankeygroup",
+                                  "resetscale", "resetview", "resetviews",
+                                  "select", "select2d", "sendDataToCloud",
+                                  "senddatatocloud", "tableRotation", "tablerotation",
+                                  "toggleHover", "toggleSpikelines", "togglehover",
+                                  "togglespikelines", "zoom", "zoom2d", "zoom3d", "zoomIn2d",
+                                  "zoomInGeo", "zoomInMapbox", "zoomOut2d", "zoomOutGeo",
+                                  "zoomOutMapbox", "zoomin", "zoomout"],
                   autosize=False,
                   width=700,
                   height=350,
@@ -331,6 +353,21 @@ fig2.update_layout(title='Volume', yaxis_title='Number of Shares',
                    autosize=False,
                    yaxis_range=placeholderVRange,
                    xaxis_range=placeholderXRange,
+                   modebar_remove=["autoScale2d", "autoscale", "editInChartStudio",
+                                   "editinchartstudio", "hoverCompareCartesian",
+                                   "hovercompare", "lasso", "lasso2d",
+                                   "orbitRotation", "orbitrotation", "pan3d",
+                                   "resetCameraDefault3d", "resetCameraLastSave3d",
+                                   "resetGeo", "resetSankeyGroup", "resetScale2d",
+                                   "resetViewMapbox", "resetViews", "resetcameradefault",
+                                   "resetcameralastsave", "resetsankeygroup",
+                                   "resetscale", "resetview", "resetviews",
+                                   "select", "select2d", "sendDataToCloud",
+                                   "senddatatocloud", "tableRotation", "tablerotation",
+                                   "toggleHover", "toggleSpikelines", "togglehover",
+                                   "togglespikelines", "zoom", "zoom2d", "zoom3d", "zoomIn2d",
+                                   "zoomInGeo", "zoomInMapbox", "zoomOut2d", "zoomOutGeo",
+                                   "zoomOutMapbox", "zoomin", "zoomout"],
                    width=700,
                    height=400,
                    margin=dict(
@@ -340,7 +377,7 @@ fig2.update_layout(title='Volume', yaxis_title='Number of Shares',
                        t=75,
                        pad=4
                    ),)
-header, subinfo = st.columns([1, 1])
+header, subinfo = st.columns([1, 2])
 change = data['Close'].iloc[-1] - data['Close'].iloc[-2]
 with header:
     price = data['Close'].iloc[-1]
@@ -354,64 +391,87 @@ with header:
               ' ({:0.2f}'.format(percentage)+'%) over the past day'
               )
 with subinfo:
-    for i in range(4):
-        st.write('')
-    prediction = st.write(st.session_state.predictiontext)
+    # if the key-value pair exists, print the message
+    if selected_stock in st.session_state.predictionary:
+        message = f":sparkles: {selected_stock}'s closing price prediction(s): {st.session_state.predictionary[selected_stock]} :sparkles:"
+        prediction = st.subheader(message)
 
-but2, but3, but4, but5, but6, but7, but8 = st.columns([
-    1, 1, 1, 1, 1, 1, 1])
+
+# Sets all buttons false to ensure only 1 toggle button appears active at a time.
+
+
+def setAllButtonsFalse():
+    st.session_state.week = False
+    st.session_state.month = False
+    st.session_state.sixmonth = False
+    st.session_state.YTD = False
+    st.session_state.year = False
+    st.session_state.fiveyear = False
+    st.session_state.Max = False
+
+
+but1, but2, but3, but4, but5, but6, but7, but8 = st.columns([
+    1, 2, 2, 2, 2, 2, 2, 2])
 with but2:
-    week = st.button(label='1W')
+    week = sbutton(label='1W', key='week', on_click=setAllButtonsFalse)
 with but3:
-    month = st.button(label='1M')
+    month = sbutton(label='1M', key='month', on_click=setAllButtonsFalse)
 with but4:
-    sixmonth = st.button(label='6M')
+    sixmonth = sbutton(label='6M', key='sixmonth', on_click=setAllButtonsFalse)
 with but5:
-    YTD = st.button(label='YTD')
+    YTD = sbutton(label='YTD', key='YTD', on_click=setAllButtonsFalse)
 with but6:
-    year = st.button(label='1Y')
+    year = sbutton(label='1Y', key='year', on_click=setAllButtonsFalse)
 with but7:
-    fiveyear = st.button(label='5Y')
+    fiveyear = sbutton(label='5Y', key='fiveyear', on_click=setAllButtonsFalse)
 with but8:
-    Max = st.button(label='Max')
+    Max = sbutton(label='Max', key='Max', on_click=setAllButtonsFalse)
+
 
 if week:
+    st.session_state.currentlayoutbutton = '1W'
     xr, yr, vr = defaultRanges(data, '1W')
     fig.update_layout(xaxis_range=xr,
                       yaxis_range=yr,)
     fig2.update_layout(xaxis_range=xr,
                        yaxis_range=vr,)
 elif month:
+    st.session_state.currentlayoutbutton = '1M'
     xr, yr, vr = defaultRanges(data, '1M')
     fig.update_layout(xaxis_range=xr,
                       yaxis_range=yr,)
     fig2.update_layout(xaxis_range=xr,
                        yaxis_range=vr,)
 elif sixmonth:
+    st.session_state.currentlayoutbutton = '6M'
     xr, yr, vr = defaultRanges(data, '6M')
     fig.update_layout(xaxis_range=xr,
                       yaxis_range=yr,)
     fig2.update_layout(xaxis_range=xr,
                        yaxis_range=vr,)
 elif YTD:
+    st.session_state.currentlayoutbutton = 'YTD'
     xr, yr, vr = defaultRanges(data, 'YTD')
     fig.update_layout(xaxis_range=xr,
                       yaxis_range=yr,)
     fig2.update_layout(xaxis_range=xr,
                        yaxis_range=vr,)
 elif year:
+    st.session_state.currentlayoutbutton = '1Y'
     xr, yr, vr = defaultRanges(data, '1Y')
     fig.update_layout(xaxis_range=xr,
                       yaxis_range=yr,)
     fig2.update_layout(xaxis_range=xr,
                        yaxis_range=vr)
 elif fiveyear:
+    st.session_state.currentlayoutbutton = '5Y'
     xr, yr, vr = defaultRanges(data, '5Y')
     fig.update_layout(xaxis_range=xr,
                       yaxis_range=yr,)
     fig2.update_layout(xaxis_range=xr,
                        yaxis_range=vr,)
 elif Max:
+    st.session_state.currentlayoutbutton = 'Max'
     xr, yr, vr = defaultRanges(data, 'Max')
     fig.update_layout(xaxis_range=xr,
                       yaxis_range=yr,)
