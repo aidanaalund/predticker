@@ -26,22 +26,22 @@ STARTOFYEAR = "f'{YEAR}-01-01'"
 
 title, loadingtext = st.columns([1, 1])
 with title:
-    st.title("Predticker:crystal_ball:")
+    st.title(":crystal_ball: Predticker")  # Comment
 
 st.caption("A magic stock predictor & dashboard")
+
 
 if 'stocks' not in st.session_state:
     st.session_state.stocks = set(["AAPL", "GOOG", "MSFT", "GME"])
 if 'predictiontext' not in st.session_state:
     # make this set to what the selector is currently set to
-    st.session_state.predictiontext = ''
+    st.session_state.predictiontext = ''  # Comment
 if 'stocktoadd' not in st.session_state:
     st.session_state.stocktoadd = ''
 if 'currentlayoutbutton' not in st.session_state:
     st.session_state.currentlayoutbutton = None
 if 'predictionary' not in st.session_state:
     st.session_state.predictionary = {}
-
 # User Input
 col1, col2, col3 = st.columns([6, 3, 3])
 
@@ -49,9 +49,19 @@ col1, col2, col3 = st.columns([6, 3, 3])
 
 
 def addstock():
-    if st.session_state.textbox != '':
-        st.session_state.stocks.add(st.session_state.textbox)
-        st.session_state.search_1 = st.session_state.textbox
+    if st.session_state.textinput != '':
+        try:
+            temp = yf.download(st.session_state.textinput, START, TODAY)
+            test = temp['Close'].iloc[0]
+            st.session_state.textinput = st.session_state.textinput.upper()
+            st.session_state.stocks.add(st.session_state.textinput)
+            st.session_state.search_1 = st.session_state.textinput
+        except:
+            # TODO: Get error message to print
+            with col3:
+                st.error(
+                    f'Error: "{st.session_state.textinput}" is an invalid ticker.')
+                st.session_state.textinput = ''
 
 
 with col1:
@@ -63,8 +73,8 @@ with col2:
                              placeholder="Type a ticker to add",
                              max_chars=4,
                              on_change=addstock,
-                             key='textbox',
-                             help='Please input a valid US ticker in all caps!')
+                             key='textinput',
+                             help='Please input a valid US ticker.')
 # with col3:
 #     st.write('')
 #     st.write('')
@@ -204,22 +214,22 @@ def predict(stockdataframe):
 
     # Print Prediction
     if len(predictions) > 0:
-        predictions_list = [str(d)+'$' for d in predictions]
+        predictions_list = ['$'+str(d) for d in predictions]
         predictions_str = ', '.join(predictions_list)
         st.session_state.predictionary[f'{selected_stock}'] = predictions_str
 
 
 # PREDICTION UI
-col3, col4, col5 = st.columns([6, 3, 3])
-with col3:
+col4, col5, col6 = st.columns([6, 3, 3])
+with col4:
     n_years = st.slider(label="Select how many days ahead you'd like to predict the closing price:",
                         min_value=1,
                         max_value=5)
-with col4:
+with col5:
     st.write('')
     st.write('')
     adder = st.button(f'Predict **{n_years}** day(s) ahead... :male_mage:')
-with col5:
+with col6:
     st.write('')
     # prediction = st.write(st.session_state.predictiontext)
     if adder:
@@ -377,7 +387,7 @@ fig2.update_layout(title='Volume', yaxis_title='Number of Shares',
                        t=75,
                        pad=4
                    ),)
-header, subinfo = st.columns([1, 2])
+header, subinfo = st.columns([2, 4])
 change = data['Close'].iloc[-1] - data['Close'].iloc[-2]
 with header:
     price = data['Close'].iloc[-1]
@@ -393,7 +403,7 @@ with header:
 with subinfo:
     # if the key-value pair exists, print the message
     if selected_stock in st.session_state.predictionary:
-        message = f":sparkles: {selected_stock}'s closing price prediction(s): {st.session_state.predictionary[selected_stock]} :sparkles:"
+        message = f"{selected_stock}'s closing price prediction(s): :magic_wand: {st.session_state.predictionary[selected_stock]}"
         prediction = st.subheader(message)
 
 
