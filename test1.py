@@ -5,6 +5,9 @@ Created on Thu Jun  8 16:48:21 2023
 @author: aidan
 """
 
+import datetime as dt
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import yfinance as yf
 import pandas as pd
 from datetime import date, timedelta
@@ -19,12 +22,9 @@ from datetime import date, timedelta
 
 # print(stock_data.head())
 
-stock_data = pd.read_csv('NFLX.csv',index_col='Date')
-print(stock_data.head())
+stock_data = pd.read_csv('NFLX.csv', index_col='Date')
+print(stock_data['Close'].iloc[-7:-1])
 
-import matplotlib.dates as mdates
-import matplotlib.pyplot as plt
-import datetime as dt
 
 # plt.figure(figsize=(15,10))
 # # This formates dates in matplotlib
@@ -112,12 +112,3 @@ import datetime as dt
 # # plt.legend()
 # # plt.gcf().autofmt_xdate()
 # # plt.show()
-
-
-
-
-
-
-
-
-
