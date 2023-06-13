@@ -224,8 +224,6 @@ with col5:
         with st.spinner('Predicting...'):
             predict(st.session_state.currentdataframe)
 
-prediction = st.write(st.session_state.predictiontext)
-
 # Define the plot types and the default layouts
 candlestick = go.Candlestick(x=data['Date'], open=data['Open'],
                              high=data['High'], low=data['Low'],
@@ -345,7 +343,7 @@ fig2.update_layout(title='Volume', yaxis_title='Number of Shares',
                        t=75,
                        pad=4
                    ),)
-header, subinfo = st.columns([10, 1])
+header, subinfo = st.columns([1, 1])
 change = data['Close'].iloc[-1] - data['Close'].iloc[-2]
 # TODO: this logic might be incorrect. Is it day over day?
 with header:
@@ -368,6 +366,11 @@ with header:
         string = '-${:0.2f}'.format(abs(change)) + \
             '  (-{:0.2f}'.format(abs(percentage))+'%)'
         st.caption(f':red[{string}]')
+with subinfo:
+    for i in range(4):
+        st.write('')
+    prediction = st.write(st.session_state.predictiontext)
+
 
 st.plotly_chart(fig, use_container_width=False)
 st.plotly_chart(fig2, use_container_width=True)
