@@ -11,6 +11,7 @@ import matplotlib.dates as mdates
 import yfinance as yf
 import pandas as pd
 from datetime import date, timedelta
+import numpy as np
 
 # START = "2019-01-01"
 # TODAY = date.today().strftime("%Y-%m-%d")
@@ -23,8 +24,9 @@ from datetime import date, timedelta
 # print(stock_data.head())
 
 stock_data = pd.read_csv('NFLX.csv', index_col='Date')
-print(stock_data['Close'].iloc[-7:-1])
+print(stock_data['Close'].iloc[-7:])
 
+stock_data.dt.qyear
 
 # plt.figure(figsize=(15,10))
 # # This formates dates in matplotlib

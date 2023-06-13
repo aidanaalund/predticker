@@ -1,5 +1,7 @@
 from datetime import date
 from collections import deque
+from datetime import datetime
+import datetime
 
 import streamlit as st
 
@@ -18,7 +20,7 @@ from keras.layers import Dense, LSTM, Dropout
 
 START = "2015-01-01"
 TODAY = date.today().strftime("%Y-%m-%d")
-YEAR = date.today().strftime("%Y")
+YEAR = int(date.today().strftime("%Y"))
 STARTOFYEAR = "f'{YEAR}-01-01'"
 
 title, loadingtext = st.columns([1, 1])
@@ -99,7 +101,6 @@ dt_breaks = [d for d in dt_all.strftime(
 # For debugging, this will display the last 5 rows of our dataframe
 # st.subheader("Raw Data")
 # st.write(data.tail())
-
 # TODO: determine if our model is even worth anything...
 
 
@@ -233,30 +234,63 @@ candlestick = go.Candlestick(x=data['Date'], open=data['Open'],
 
 volume = go.Scatter(x=data['Date'], y=data['Volume'])
 
-# Returns an x/y range that shows a scaled 1W graph
-# The range is returned in a format [min, max]
-# There are two different y ranges returned for candlestick vs scatter
 
+@st.cache_data
+def defaultRanges(df, period):
 
-def defaultRanges(df):
+    bf = 30
 
-    bf = -25
+    match period:
+        case '1W':
+            bf = 7
+        case '1M':
+            bf = 30
+        case '6M':
+            bf = 180
+        case '1Y':
+            bf = 365
+        case '5Y':
+            bf = 365*5
+        case 'YTD':
+            firstday = datetime.datetime(YEAR, 1, 1)
+            x = [firstday, df['Date'].iloc[-1]]
+            ymax = df['High'].max()
+            ymin = df['Low'].min()
+            cbuffer = (ymax-ymin)*0.30
+            ycandle = [ymin-cbuffer,
+                       ymax+cbuffer]
+            yvolume = [df['Volume'].min(), df['Volume'].max()]
+            return x, ycandle, yvolume
+        case 'Max':
+            # TODO: the issue is that the first day of the year is new year's
+            x = [df['Date'].iloc[0], df['Date'].iloc[-1]]
+            ymax = df['High'].max()
+            ymin = df['Low'].min()
+            cbuffer = (ymax-ymin)*0.30
+            ycandle = [ymin-cbuffer,
+                       ymax+cbuffer]
+            yvolume = [df['Volume'].min(), df['Volume'].max()]
+            return x, ycandle, yvolume
 
-    x = [df['Date'].iloc[bf], df['Date'].iloc[-1]]
+    lower = df['Date'].iloc[-1]-np.timedelta64(bf, 'D')
 
-    cbuffer = (df['High'].iloc[bf:-1].max() -
-               df['Low'].iloc[bf:-1].min())*0.25
-    ycandle = [df['Low'].iloc[bf:-1].min()-cbuffer,
-               df['High'].iloc[bf:-1].max()+cbuffer]
-    vbuffer = (df['Volume'].iloc[bf:-1].max() -
-               df['Volume'].iloc[bf:-1].min())*0.25
-    yvolume = [df['Volume'].iloc[bf:-1].min()-vbuffer,
-               df['Volume'].iloc[bf:-1].max()+vbuffer]
+    upper = df['Date'].iloc[-1]+np.timedelta64(1, 'D')
+
+    x = [lower, upper]
+    cbuffer = (df['High'].iloc[-bf: -1].max() -
+               df['Low'].iloc[-bf:-1].min())*0.30
+    ycandle = [df['Low'].iloc[-bf:-1].min()-cbuffer,
+               df['High'].iloc[-bf:-1].max()+cbuffer]
+    vbuffer = (df['Volume'].iloc[-bf:-1].max() -
+               df['Volume'].iloc[-bf:-1].min())*0.30
+    yvolume = [df['Volume'].iloc[-bf:-1].min()-vbuffer,
+               df['Volume'].iloc[-bf:-1].max()+vbuffer]
 
     return x, ycandle, yvolume
 
 
-xrange, ycandlerange, yvolumerange = defaultRanges(data)
+placeholderXRange, placeholderYRange, placeholderVRange = defaultRanges(
+    data, 80085)
 
 stocklayout = dict(
 
@@ -265,63 +299,27 @@ stocklayout = dict(
     xaxis_rangeslider_visible=True,
     xaxis=dict(
         fixedrange=True,
-        rangeselector=dict(
-            buttons=list([
-                dict(count=1,
-                     label="1D",
-                     step="day",
-                     stepmode="backward"),
-                dict(count=7,
-                     label="1W",
-                     step="day",
-                     stepmode="backward"),
-                dict(count=1,
-                     label="1M",
-                     step="month",
-                     stepmode="backward"),
-                dict(count=6,
-                     label="6M",
-                     step="month",
-                     stepmode="backward"),
-                dict(count=1,
-                     label="YTD",
-                     step="year",
-                     stepmode="todate"),
-                dict(count=1,
-                     label="1Y",
-                     step="year",
-                     stepmode="backward"),
-                dict(count=5,
-                     label="5Y",
-                     step="year",
-                     stepmode="backward"),
-                dict(step="all")
-            ])
-        ),
-
         rangebreaks=[
             dict(bounds=["sat", "mon"]),  # hide weekends
             dict(values=dt_breaks)
         ],
 
-        range=xrange
     )
+
+
 )
 
 # Display candlestick and volume plots
-# TODO: determine how to limit panning
 fig = go.Figure(data=candlestick, layout=stocklayout)
 fig.update_layout(title='',
-                  yaxis=dict(
-                      range=ycandlerange
-
-                  ),
                   yaxis_title='Share Price ($)',
+                  yaxis_range=placeholderYRange,
+                  xaxis_range=placeholderXRange,
                   autosize=False,
                   width=700,
                   height=350,
                   margin=dict(
-                      l=10,
+                      l=0,
                       r=0,
                       b=0,
                       t=0,
@@ -331,9 +329,8 @@ fig.update_layout(title='',
 fig2 = go.Figure(data=volume, layout=stocklayout)
 fig2.update_layout(title='Volume', yaxis_title='Number of Shares',
                    autosize=False,
-                   yaxis=dict(
-                       range=yvolumerange
-                   ),
+                   yaxis_range=placeholderVRange,
+                   xaxis_range=placeholderXRange,
                    width=700,
                    height=400,
                    margin=dict(
@@ -345,32 +342,81 @@ fig2.update_layout(title='Volume', yaxis_title='Number of Shares',
                    ),)
 header, subinfo = st.columns([1, 1])
 change = data['Close'].iloc[-1] - data['Close'].iloc[-2]
-# TODO: this logic might be incorrect. Is it day over day?
 with header:
     price = data['Close'].iloc[-1]
-    # DoD increase, percentage increase, arrow
 
     percentage = (float(data['Close'].iloc[-1] -
-                  data['Close'].iloc[-2])/abs(data['Close'].iloc[-2]))*100.00
-    if change > 0:
-        st.header('${:0.2f}'.format(price)+':chart_with_upwards_trend:')
-        string = '+${:0.2f}'.format(change) + \
-            '  (+{:0.2f}'.format(percentage)+'%)'
-        st.caption(f':green[{string}]')
-    elif change == 0:
-        st.header('${:0.2f}'.format(price)+':arrow_right:')
-        st.caption('+${:0.2f}'.format(change) +
-                   '  (+{:0.2f}'.format(percentage)+'%)')
-    else:
-        st.header('${:0.2f}'.format(price)+':chart_with_downwards_trend:')
-        string = '-${:0.2f}'.format(abs(change)) + \
-            '  (-{:0.2f}'.format(abs(percentage))+'%)'
-        st.caption(f':red[{string}]')
+                        data['Close'].iloc[-2])/abs(data['Close'].iloc[-2]))*100.00
+
+    st.metric(label=selected_stock,
+              value='${:0.2f}'.format(price),
+              delta='{:0.2f}'.format(change) +
+              ' ({:0.2f}'.format(percentage)+'%) over the past day'
+              )
 with subinfo:
     for i in range(4):
         st.write('')
     prediction = st.write(st.session_state.predictiontext)
 
+but2, but3, but4, but5, but6, but7, but8 = st.columns([
+    1, 1, 1, 1, 1, 1, 1])
+with but2:
+    week = st.button(label='1W')
+with but3:
+    month = st.button(label='1M')
+with but4:
+    sixmonth = st.button(label='6M')
+with but5:
+    YTD = st.button(label='YTD')
+with but6:
+    year = st.button(label='1Y')
+with but7:
+    fiveyear = st.button(label='5Y')
+with but8:
+    Max = st.button(label='Max')
 
-st.plotly_chart(fig, use_container_width=False)
-st.plotly_chart(fig2, use_container_width=True)
+if week:
+    xr, yr, vr = defaultRanges(data, '1W')
+    fig.update_layout(xaxis_range=xr,
+                      yaxis_range=yr,)
+    fig2.update_layout(xaxis_range=xr,
+                       yaxis_range=vr,)
+elif month:
+    xr, yr, vr = defaultRanges(data, '1M')
+    fig.update_layout(xaxis_range=xr,
+                      yaxis_range=yr,)
+    fig2.update_layout(xaxis_range=xr,
+                       yaxis_range=vr,)
+elif sixmonth:
+    xr, yr, vr = defaultRanges(data, '6M')
+    fig.update_layout(xaxis_range=xr,
+                      yaxis_range=yr,)
+    fig2.update_layout(xaxis_range=xr,
+                       yaxis_range=vr,)
+elif YTD:
+    xr, yr, vr = defaultRanges(data, 'YTD')
+    fig.update_layout(xaxis_range=xr,
+                      yaxis_range=yr,)
+    fig2.update_layout(xaxis_range=xr,
+                       yaxis_range=vr,)
+elif year:
+    xr, yr, vr = defaultRanges(data, '1Y')
+    fig.update_layout(xaxis_range=xr,
+                      yaxis_range=yr,)
+    fig2.update_layout(xaxis_range=xr,
+                       yaxis_range=vr)
+elif fiveyear:
+    xr, yr, vr = defaultRanges(data, '5Y')
+    fig.update_layout(xaxis_range=xr,
+                      yaxis_range=yr,)
+    fig2.update_layout(xaxis_range=xr,
+                       yaxis_range=vr,)
+elif Max:
+    xr, yr, vr = defaultRanges(data, 'Max')
+    fig.update_layout(xaxis_range=xr,
+                      yaxis_range=yr,)
+    fig2.update_layout(xaxis_range=xr,
+                       yaxis_range=vr,)
+
+st.plotly_chart(fig)
+st.plotly_chart(fig2)

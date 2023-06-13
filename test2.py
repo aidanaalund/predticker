@@ -136,47 +136,47 @@ print(raw_price_df.head())
 print(raw_price_df.info())
 print(raw_price_df.tail())
 
-# Pre-process Data
-# Drop everything but the Closing Price and the associated date
-raw_price_df = raw_price_df.drop(
-    ['Open', 'High', 'Low', 'Adj Close', 'Volume', 'Dividends', 'Stock Splits'], axis=1)
-raw_price_df['Date'] = raw_price_df.index
-scaler = RobustScaler()
-raw_price_df['scaled_close'] = scaler.fit_transform(
-    np.expand_dims(raw_price_df['Close'].values, axis=1))
+# # Pre-process Data
+# # Drop everything but the Closing Price and the associated date
+# raw_price_df = raw_price_df.drop(
+#     ['Open', 'High', 'Low', 'Adj Close', 'Volume', 'Dividends', 'Stock Splits'], axis=1)
+# raw_price_df['Date'] = raw_price_df.index
+# scaler = RobustScaler()
+# raw_price_df['scaled_close'] = scaler.fit_transform(
+#     np.expand_dims(raw_price_df['Close'].values, axis=1))
 
-# Set Parameters/Hyperparameters
-NUMBER_of_STEPS_BACK = 14  # Number of days back that the model will be trained for
-# Number of days that the model will predict. To predict the next three days, modify it as follows: [1,2,3]
-PREDICTION_STEPS = [1, 2, 3, 4, 5, 6]
-BATCH_SIZE = 16  # Number of training samples that will be passed to the network in one epoch
-# Probability to exclude the input and recurrent connections to improve performance by regularization (25%)
-DROPOUT = 0.25
-UNITS = 120  # Number of neurons connected to the layer
-EPOCHS = 15  # Number of times that the learning algorithm will work through the entire training set
-LOSS = 'mean_squared_error'  # Methodology to measure the inaccuracy
-OPTIMIZER = 'adam'  # Optimizer used to iterate to better states
+# # Set Parameters/Hyperparameters
+# NUMBER_of_STEPS_BACK = 14  # Number of days back that the model will be trained for
+# # Number of days that the model will predict. To predict the next three days, modify it as follows: [1,2,3]
+# PREDICTION_STEPS = [1, 2, 3, 4, 5, 6]
+# BATCH_SIZE = 16  # Number of training samples that will be passed to the network in one epoch
+# # Probability to exclude the input and recurrent connections to improve performance by regularization (25%)
+# DROPOUT = 0.25
+# UNITS = 120  # Number of neurons connected to the layer
+# EPOCHS = 15  # Number of times that the learning algorithm will work through the entire training set
+# LOSS = 'mean_squared_error'  # Methodology to measure the inaccuracy
+# OPTIMIZER = 'adam'  # Optimizer used to iterate to better states
 
-# Make Prediction
-predictions = []
+# # Make Prediction
+# predictions = []
 
-for step in PREDICTION_STEPS:
-    last_sequence, x_train, y_train = Prepare_Data(raw_price_df, step)
-    x_train = x_train[:, :, :1].astype(np.float32)
+# for step in PREDICTION_STEPS:
+#     last_sequence, x_train, y_train = Prepare_Data(raw_price_df, step)
+#     x_train = x_train[:, :, :1].astype(np.float32)
 
-    model = Train_Model(x_train, y_train, NUMBER_of_STEPS_BACK,
-                        BATCH_SIZE, UNITS, EPOCHS, DROPOUT, OPTIMIZER, LOSS)
+#     model = Train_Model(x_train, y_train, NUMBER_of_STEPS_BACK,
+#                         BATCH_SIZE, UNITS, EPOCHS, DROPOUT, OPTIMIZER, LOSS)
 
-    last_sequence = last_sequence[-NUMBER_of_STEPS_BACK:]
-    last_sequence = np.expand_dims(last_sequence, axis=0)
-    prediction = model.predict(last_sequence)
-    predicted_price = scaler.inverse_transform(prediction)[0][0]
+#     last_sequence = last_sequence[-NUMBER_of_STEPS_BACK:]
+#     last_sequence = np.expand_dims(last_sequence, axis=0)
+#     prediction = model.predict(last_sequence)
+#     predicted_price = scaler.inverse_transform(prediction)[0][0]
 
-    predictions.append(round(float(predicted_price), 2))
+#     predictions.append(round(float(predicted_price), 2))
 
-# Print Prediction
-if len(predictions) > 0:
-    predictions_list = [str(d)+'$' for d in predictions]
-    predictions_str = ', '.join(predictions_list)
-    message = f'{STOCK} share price prediction for the next day(s) {predictions_str}'
-    print(message)
+# # Print Prediction
+# if len(predictions) > 0:
+#     predictions_list = [str(d)+'$' for d in predictions]
+#     predictions_str = ', '.join(predictions_list)
+#     message = f'{STOCK} share price prediction for the next day(s) {predictions_str}'
+#     print(message)
