@@ -49,14 +49,14 @@ col1, col2, col3 = st.columns([6, 3, 3])
 
 
 def addstock():
-    if st.session_state.textinput != '':
+    if st.session_state.textinput:
         try:
             temp = yf.download(st.session_state.textinput, START, TODAY)
             test = temp['Close'].iloc[0]
             st.session_state.textinput = st.session_state.textinput.upper()
             st.session_state.stocks.add(st.session_state.textinput)
             st.session_state.search_1 = st.session_state.textinput
-        except:
+        except IndexError:
             # TODO: Get error message to print
             with col3:
                 st.error(
