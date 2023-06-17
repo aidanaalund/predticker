@@ -1,0 +1,10 @@
+streamlit
+streamlit_extras.stateful_button
+pandas
+yfinance
+plotly
+numpy
+sklearn.preprocessing
+tensorflow
+keras.models
+keras.layers
