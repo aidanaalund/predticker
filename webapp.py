@@ -36,8 +36,6 @@ if 'stocks' not in st.session_state:
 if 'predictiontext' not in st.session_state:
     # make this set to what the selector is currently set to
     st.session_state.predictiontext = ''  # Comment
-if 'stocktoadd' not in st.session_state:
-    st.session_state.stocktoadd = ''
 if 'currentlayoutbutton' not in st.session_state:
     st.session_state.currentlayoutbutton = None
 if 'predictionary' not in st.session_state:
@@ -46,6 +44,7 @@ if 'predictionary' not in st.session_state:
 col1, col2, col3 = st.columns([6, 3, 3])
 
 # Callback that adds an inputted stock string to a list of stocks in the state
+# Checks for an invalid ticker by attempting to get the first value in a column
 
 
 def addstock():
@@ -185,12 +184,12 @@ def predict(stockdataframe):
     # TODO: allow PREDICTION_STEPS to be modified based on the slider.
     # There is some kind of method built in with range() to do this
     # Number of days that the model will predict. To predict the next three days, modify it as follows: [1,2,3]
-    PREDICTION_STEPS = [1]
+    PREDICTION_STEPS = list(range(1, n_years+1))
     BATCH_SIZE = 16  # Number of training samples that will be passed to the network in one epoch
     # Probability to exclude the input and recurrent connections to improve performance by regularization (25%)
     DROPOUT = 0.25
     UNITS = 60  # Number of neurons connected to the layer
-    EPOCHS = 15  # Number of times that the learning algorithm will work through the entire training set
+    EPOCHS = 10  # Number of times that the learning algorithm will work through the entire training set
     LOSS = 'mean_squared_error'  # Methodology to measure the inaccuracy
     OPTIMIZER = 'adam'  # Optimizer used to iterate to better states
     scaler = RobustScaler()
@@ -215,9 +214,10 @@ def predict(stockdataframe):
 
     # Print Prediction
     if len(predictions) > 0:
-        predictions_list = ['$'+str(d) for d in predictions]
-        predictions_str = ', '.join(predictions_list)
-        st.session_state.predictionary[f'{selected_stock}'] = predictions_str
+        predictions_list = [str(d) for d in predictions]
+        predictions_str = ', $'.join(predictions_list)
+        st.session_state.predictionary[f'{selected_stock}'] = '\$' + \
+            predictions_str
 
 
 # PREDICTION UI
