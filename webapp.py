@@ -398,7 +398,7 @@ with header:
     st.metric(label=selected_stock,
               value='${:0.2f}'.format(price),
               delta='{:0.2f}'.format(change) +
-              ' ({:0.2f}'.format(percentage)+'%) over the past day'
+              ' ({:0.2f}'.format(percentage)+'%) day/day'
               )
 with subinfo:
     # if the key-value pair exists, print the message
