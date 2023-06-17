@@ -1,4 +1,4 @@
-streamlit_extras.stateful_button
+streamlit-extras
 pandas
 yfinance
 plotly
