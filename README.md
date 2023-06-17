@@ -1,4 +1,4 @@
-# predticker
+#:crystal_ball: predticker
 A web application that identifies stock patterns of publicly traded companies and speculates future values.
 
 Our prototype currently uses the streamlit library, to run it either check out our deployed version (coming soon!) 
