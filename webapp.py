@@ -119,6 +119,7 @@ dt_breaks = [d for d in dt_all.strftime(
 # @st.cache_resource(show_spinner=False)
 
 
+@st.cache_resource(show_spinner=False)
 def predict(stockdataframe):
 
     # TODO: start a timer that gives some info on how long it took to predict?
@@ -249,7 +250,7 @@ candlestick = go.Candlestick(x=data['Date'], open=data['Open'],
 volume = go.Scatter(x=data['Date'], y=data['Volume'])
 
 # Computes a scaled view for both plots based on the view mode and data
-# Returned as an x range and two y ranges for each plot
+# Returned as an x range and two y ranges for each plot type (candle and volume)
 
 
 @st.cache_data
@@ -305,9 +306,20 @@ def defaultRanges(df, period):
 
     return x, ycandle, yvolume
 
+# Calls defaultRanges to obtain proper scales and scales the plots passed in
+# Assumes plot1 is a candlestick and plot2 is a volume/scatter plot
+
+
+def scalePlots(df, period, plotly1, plotly2):
+    xr, cr, vr = defaultRanges(df, period)
+    plotly1.update_layout(xaxis_range=xr,
+                          yaxis_range=cr,)
+    plotly2.update_layout(xaxis_range=xr,
+                          yaxis_range=vr,)
+
 
 placeholderXRange, placeholderYRange, placeholderVRange = defaultRanges(
-    data, 80085)
+    data, '_')
 
 stocklayout = dict(
 
@@ -322,8 +334,6 @@ stocklayout = dict(
         ],
 
     )
-
-
 )
 
 # Display candlestick and volume plots
@@ -388,6 +398,7 @@ fig2.update_layout(title='Volume', yaxis_title='Number of Shares',
                        pad=4
                    ),)
 header, subinfo = st.columns([2, 4])
+# TODO: Refactor to account for the view? (e.g YTD shows YTD change)
 change = data['Close'].iloc[-1] - data['Close'].iloc[-2]
 with header:
     price = data['Close'].iloc[-1]
@@ -437,56 +448,28 @@ with but7:
 with but8:
     Max = sbutton(label='Max', key='Max', on_click=setAllButtonsFalse)
 
-
+# There may be a way to use switch cases here, but Streamlit makes it odd...
 if week:
     st.session_state.currentlayoutbutton = '1W'
-    xr, yr, vr = defaultRanges(data, '1W')
-    fig.update_layout(xaxis_range=xr,
-                      yaxis_range=yr,)
-    fig2.update_layout(xaxis_range=xr,
-                       yaxis_range=vr,)
+    scalePlots(data, '1W', fig, fig2)
 elif month:
     st.session_state.currentlayoutbutton = '1M'
-    xr, yr, vr = defaultRanges(data, '1M')
-    fig.update_layout(xaxis_range=xr,
-                      yaxis_range=yr,)
-    fig2.update_layout(xaxis_range=xr,
-                       yaxis_range=vr,)
+    scalePlots(data, '1M', fig, fig2)
 elif sixmonth:
     st.session_state.currentlayoutbutton = '6M'
-    xr, yr, vr = defaultRanges(data, '6M')
-    fig.update_layout(xaxis_range=xr,
-                      yaxis_range=yr,)
-    fig2.update_layout(xaxis_range=xr,
-                       yaxis_range=vr,)
+    scalePlots(data, '6M', fig, fig2)
 elif YTD:
     st.session_state.currentlayoutbutton = 'YTD'
-    xr, yr, vr = defaultRanges(data, 'YTD')
-    fig.update_layout(xaxis_range=xr,
-                      yaxis_range=yr,)
-    fig2.update_layout(xaxis_range=xr,
-                       yaxis_range=vr,)
+    scalePlots(data, 'YTD', fig, fig2)
 elif year:
     st.session_state.currentlayoutbutton = '1Y'
-    xr, yr, vr = defaultRanges(data, '1Y')
-    fig.update_layout(xaxis_range=xr,
-                      yaxis_range=yr,)
-    fig2.update_layout(xaxis_range=xr,
-                       yaxis_range=vr)
+    scalePlots(data, '1Y', fig, fig2)
 elif fiveyear:
     st.session_state.currentlayoutbutton = '5Y'
-    xr, yr, vr = defaultRanges(data, '5Y')
-    fig.update_layout(xaxis_range=xr,
-                      yaxis_range=yr,)
-    fig2.update_layout(xaxis_range=xr,
-                       yaxis_range=vr,)
+    scalePlots(data, '5Y', fig, fig2)
 elif Max:
     st.session_state.currentlayoutbutton = 'Max'
-    xr, yr, vr = defaultRanges(data, 'Max')
-    fig.update_layout(xaxis_range=xr,
-                      yaxis_range=yr,)
-    fig2.update_layout(xaxis_range=xr,
-                       yaxis_range=vr,)
+    scalePlots(data, 'Max', fig, fig2)
 
 st.plotly_chart(fig)
 st.plotly_chart(fig2)
