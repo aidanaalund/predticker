@@ -215,7 +215,7 @@ def predict(stockdataframe):
     # Print Prediction
     if len(predictions) > 0:
         predictions_list = [str(d) for d in predictions]
-        predictions_str = ', $'.join(predictions_list)
+        predictions_str = ', \$'.join(predictions_list)
         st.session_state.predictionary[f'{selected_stock}'] = '\$' + \
             predictions_str
 
