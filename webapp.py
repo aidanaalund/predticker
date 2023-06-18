@@ -5,6 +5,7 @@ import datetime
 
 import streamlit as st
 from streamlit_extras.stateful_button import button as sbutton
+from streamlit_extras.badges import badge as badge
 
 import pandas as pd
 # from pandas.tseries.holiday import USFederalHolidayCalendar
@@ -40,6 +41,21 @@ if 'currentlayoutbutton' not in st.session_state:
     st.session_state.currentlayoutbutton = None
 if 'predictionary' not in st.session_state:
     st.session_state.predictionary = {}
+if 'weekon' not in st.session_state:
+    st.session_state.weekon = False
+if 'monthon' not in st.session_state:
+    st.session_state.monthon = False
+if 'sixmonthon' not in st.session_state:
+    st.session_state.sixmonthon = False
+if 'ytdon' not in st.session_state:
+    st.session_state.ytdon = False
+if 'yearon' not in st.session_state:
+    st.session_state.yearon = False
+if 'fiveyearon' not in st.session_state:
+    st.session_state.fiveyearon = False
+if 'maxon' not in st.session_state:
+    st.session_state.maxon = False
+
 # User Input
 col1, col2, col3 = st.columns([6, 3, 3])
 
@@ -417,9 +433,38 @@ with subinfo:
 
 
 # Sets all buttons false to ensure only 1 toggle button appears active at a time.
+def enableAllButtons():
+    st.session_state.weekon = False
+    st.session_state.monthon = False
+    st.session_state.sixmonthon = False
+    st.session_state.ytdon = False
+    st.session_state.yearon = False
+    st.session_state.fiveyearon = False
+    st.session_state.maxon = False
 
 
-def setAllButtonsFalse():
+def disableButton(buttonToDisable):
+    match buttonToDisable:
+        case '1W':
+            st.session_state.weekon = True
+        case '1M':
+            st.session_state.monthon = True
+        case '6M':
+            st.session_state.sixmonthon = True
+        case 'YTD':
+            st.session_state.ytdon = True
+        case '1Y':
+            st.session_state.yearon = True
+        case '5Y':
+            st.session_state.fiveyearon = True
+        case 'Max':
+            st.session_state.maxon = True
+
+
+def setAllButtonsFalse(buttonToDisable):
+    # TODO: create logic to ensure a button can't be 'detoggled' unless another button does so
+    enableAllButtons()
+    disableButton(buttonToDisable)
     st.session_state.week = False
     st.session_state.month = False
     st.session_state.sixmonth = False
@@ -432,19 +477,26 @@ def setAllButtonsFalse():
 but1, but2, but3, but4, but5, but6, but7, but8 = st.columns([
     1, 2, 2, 2, 2, 2, 2, 2])
 with but2:
-    week = sbutton(label='1W', key='week', on_click=setAllButtonsFalse)
+    week = sbutton(label='1W', key='week', on_click=setAllButtonsFalse,
+                   disabled=st.session_state.weekon, args=('1W',))
 with but3:
-    month = sbutton(label='1M', key='month', on_click=setAllButtonsFalse)
+    month = sbutton(label='1M', key='month',
+                    on_click=setAllButtonsFalse, disabled=st.session_state.monthon, args=('1M',))
 with but4:
-    sixmonth = sbutton(label='6M', key='sixmonth', on_click=setAllButtonsFalse)
+    sixmonth = sbutton(label='6M', key='sixmonth',
+                       on_click=setAllButtonsFalse, disabled=st.session_state.sixmonthon, args=('6M',))
 with but5:
-    YTD = sbutton(label='YTD', key='YTD', on_click=setAllButtonsFalse)
+    YTD = sbutton(label='YTD', key='YTD',
+                  on_click=setAllButtonsFalse, disabled=st.session_state.ytdon, args=('YTD',))
 with but6:
-    year = sbutton(label='1Y', key='year', on_click=setAllButtonsFalse)
+    year = sbutton(label='1Y', key='year',
+                   on_click=setAllButtonsFalse, disabled=st.session_state.yearon, args=('1Y',))
 with but7:
-    fiveyear = sbutton(label='5Y', key='fiveyear', on_click=setAllButtonsFalse)
+    fiveyear = sbutton(label='5Y', key='fiveyear',
+                       on_click=setAllButtonsFalse, disabled=st.session_state.fiveyearon, args=('5Y',))
 with but8:
-    Max = sbutton(label='Max', key='Max', on_click=setAllButtonsFalse)
+    Max = sbutton(label='Max', key='Max',
+                  on_click=setAllButtonsFalse, disabled=st.session_state.maxon, args=('Max',))
 
 # There may be a way to use switch cases here, but Streamlit makes it odd...
 if week:
@@ -471,3 +523,4 @@ elif Max:
 
 st.plotly_chart(fig)
 st.plotly_chart(fig2)
+badge(type="github", name="aidanaalund/predticker")
