@@ -113,16 +113,14 @@ dt_breaks = [d for d in dt_all.strftime(
 # st.subheader("Raw Data")
 # st.write(data.tail())
 
-# Returns a predicted price for a stock using an LSTM
-# Caching this seemed to cause a bug? Check this later...
-# @st.cache_resource(show_spinner=False)
+# Writes a string of price predictions to a stock's entry in the state variable
+# Takes in a dataframe of stock values, and checks the slider value
 
 
 @st.cache_resource(show_spinner=False)
 def predict(stockdataframe):
 
-    # TODO: start a timer that gives some info on how long it took to predict?
-    # To put the data set in the correct form for training, 'Prepare_Data' function is implemented
+    # Put the data set in the correct form for training
     def Prepare_Data(dataframe, days):
 
         df = dataframe.copy()
@@ -153,7 +151,7 @@ def predict(stockdataframe):
 
         return last_sequence, X, Y
 
-    # To train the one-of-a-kind LSTM model with set hyperparameters, 'Train_Model' function is implemented
+    # Trains the LSTM model with set hyperparameters
     def Train_Model(x_train, y_train, NUMBER_of_STEPS_BACK, BATCH_SIZE, UNITS, EPOCHS, DROPOUT, OPTIMIZER, LOSS):
 
         model = Sequential()
@@ -325,9 +323,9 @@ stocklayout = dict(
 
     yaxis=dict(fixedrange=False,
                ),
-    xaxis_rangeslider_visible=True,
+    xaxis_rangeslider_visible=False,
     xaxis=dict(
-        fixedrange=True,
+        fixedrange=False,
         rangebreaks=[
             dict(bounds=["sat", "mon"]),  # hide weekends
             dict(values=dt_breaks)
