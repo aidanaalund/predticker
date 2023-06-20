@@ -1,3 +1,4 @@
+from streamlit_option_menu import option_menu
 from datetime import date
 from collections import deque
 from datetime import datetime
@@ -24,6 +25,7 @@ START = "2015-01-01"
 TODAY = date.today().strftime("%Y-%m-%d")
 YEAR = int(date.today().strftime("%Y"))
 STARTOFYEAR = "f'{YEAR}-01-01'"
+
 
 title, loadingtext = st.columns([1, 1])
 with title:
@@ -90,11 +92,6 @@ with col2:
                              on_change=addstock,
                              key='textinput',
                              help='Please input a valid US ticker.')
-# with col3:
-#     st.write('')
-#     st.write('')
-#     adder = st.button('Add stock', on_click=addstock,
-#                  args=(newstock, ))
 
 
 # Load correctly formatted data in a pandas dataframe
@@ -133,7 +130,6 @@ dt_breaks = [d for d in dt_all.strftime(
 # Takes in a dataframe of stock values, and checks the slider value
 
 
-@st.cache_resource(show_spinner=False)
 def predict(stockdataframe):
 
     # Put the data set in the correct form for training
@@ -168,6 +164,7 @@ def predict(stockdataframe):
         return last_sequence, X, Y
 
     # Trains the LSTM model with set hyperparameters
+    @st.cache_resource(show_spinner=False)
     def Train_Model(x_train, y_train, NUMBER_of_STEPS_BACK, BATCH_SIZE, UNITS, EPOCHS, DROPOUT, OPTIMIZER, LOSS):
 
         model = Sequential()
@@ -254,6 +251,21 @@ with col6:
             predict(st.session_state.currentdataframe)
 
 # Define the plot types and the default layouts
+stocklayout = dict(
+
+    yaxis=dict(fixedrange=False,
+               ),
+    xaxis_rangeslider_visible=False,
+    xaxis=dict(
+        fixedrange=False,
+        rangebreaks=[
+            dict(bounds=["sat", "mon"]),  # hide weekends
+            dict(values=dt_breaks)
+        ],
+
+    )
+)
+
 candlestick = go.Candlestick(x=data['Date'], open=data['Open'],
                              high=data['High'], low=data['Low'],
                              close=data['Close'],
@@ -335,24 +347,11 @@ def scalePlots(df, period, plotly1, plotly2):
 placeholderXRange, placeholderYRange, placeholderVRange = defaultRanges(
     data, '_')
 
-stocklayout = dict(
-
-    yaxis=dict(fixedrange=False,
-               ),
-    xaxis_rangeslider_visible=False,
-    xaxis=dict(
-        fixedrange=False,
-        rangebreaks=[
-            dict(bounds=["sat", "mon"]),  # hide weekends
-            dict(values=dt_breaks)
-        ],
-
-    )
-)
 
 # Display candlestick and volume plots
 fig = go.Figure(data=candlestick, layout=stocklayout)
 fig.update_layout(title='',
+                  dragmode='pan',
                   yaxis_title='Share Price ($)',
                   yaxis_range=placeholderYRange,
                   xaxis_range=placeholderXRange,
@@ -368,9 +367,7 @@ fig.update_layout(title='',
                                   "select", "select2d", "sendDataToCloud",
                                   "senddatatocloud", "tableRotation", "tablerotation",
                                   "toggleHover", "toggleSpikelines", "togglehover",
-                                  "togglespikelines", "zoom", "zoom2d", "zoom3d", "zoomIn2d",
-                                  "zoomInGeo", "zoomInMapbox", "zoomOut2d", "zoomOutGeo",
-                                  "zoomOutMapbox", "zoomin", "zoomout"],
+                                  "togglespikelines",],
                   autosize=False,
                   width=700,
                   height=350,
@@ -385,6 +382,7 @@ fig.update_layout(title='',
 fig2 = go.Figure(data=volume, layout=stocklayout)
 fig2.update_layout(title='Volume', yaxis_title='Number of Shares',
                    autosize=False,
+                   dragmode='pan',
                    yaxis_range=placeholderVRange,
                    xaxis_range=placeholderXRange,
                    modebar_remove=["autoScale2d", "autoscale", "editInChartStudio",
@@ -399,15 +397,13 @@ fig2.update_layout(title='Volume', yaxis_title='Number of Shares',
                                    "select", "select2d", "sendDataToCloud",
                                    "senddatatocloud", "tableRotation", "tablerotation",
                                    "toggleHover", "toggleSpikelines", "togglehover",
-                                   "togglespikelines", "zoom", "zoom2d", "zoom3d", "zoomIn2d",
-                                   "zoomInGeo", "zoomInMapbox", "zoomOut2d", "zoomOutGeo",
-                                   "zoomOutMapbox", "zoomin", "zoomout"],
+                                   "togglespikelines"],
                    width=700,
                    height=400,
                    margin=dict(
                        l=0,
                        r=10,
-                       b=100,
+                       b=0,
                        t=75,
                        pad=4
                    ),)
@@ -523,4 +519,22 @@ elif Max:
 
 st.plotly_chart(fig)
 st.plotly_chart(fig2)
+
+# Credits/Links
+st.divider()
 badge(type="github", name="aidanaalund/predticker")
+url = "https://www.streamlit.io"
+st.caption('Made with [Streamlit](%s)' % url)
+st.caption("(This is not financial advice!)")
+
+
+# HTML to hide the 'Made with streamlit' text
+hide_menu = """
+<style>
+footer{
+    visibility:hidden;
+}
+<style>
+"""
+
+st.markdown(hide_menu, unsafe_allow_html=True)
