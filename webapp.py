@@ -4,7 +4,7 @@ from datetime import datetime
 import datetime
 
 import streamlit as st
-from streamlit_extras.stateful_button import button as sbutton
+# from streamlit_extras.stateful_button import button as sbutton
 from streamlit_extras.badges import badge as badge
 
 import pandas as pd
@@ -160,7 +160,7 @@ if 'currentdataframe' not in st.session_state:
     # make this set to what the selector is currently set to
     st.session_state.currentdataframe = data
 
-# Data preprocessing
+# DATA PREPROCESSING
 # grab first and last observations from df.date and make a continuous date range from that
 dt_all = pd.date_range(
     start=data['Date'].iloc[0], end=data['Date'].iloc[-1], freq='D')
@@ -169,11 +169,6 @@ dt_obs = [d.strftime("%Y-%m-%d") for d in data['Date']]
 # isolate missing timestamps
 dt_breaks = [d for d in dt_all.strftime(
     "%Y-%m-%d").tolist() if not d in dt_obs]
-
-# For debugging, this will display the last 5 rows of our dataframe
-
-# Writes a string of price predictions to a stock's entry in the state variable
-# Takes in a dataframe of stock values, and checks the slider value
 
 
 def predict(stockdataframe):
@@ -406,6 +401,34 @@ stocklayout = dict(
 
 # Computes a scaled view for both plots based on the view mode and data
 # Returned as an x range and two y ranges for each plot type (candle and volume)
+header, subinfo = st.columns([2, 4])
+change = data['Close'].iloc[-1] - data['Close'].iloc[-2]
+with header:
+    price = data['Close'].iloc[-1]
+
+    percentage = (float(data['Close'].iloc[-1] -
+                        data['Close'].iloc[-2])/abs(data['Close'].iloc[-2]))*100.00
+
+    st.metric(label=selected_stock,
+              value='${:0.2f}'.format(price),
+              delta='{:0.2f}'.format(change) +
+              ' ({:0.2f}'.format(percentage)+'%) today'
+              )
+    recentclose = data['Date'].iloc[-1].strftime('%Y-%m-%d')
+    st.caption(f'Closed: {recentclose}')
+    st.markdown("""
+        <style>
+        [data-testid=column]:nth-of-type(1) [data-testid=stVerticalBlock]{
+            gap: 0rem;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+with subinfo:
+    if selected_stock in st.session_state.predictionary:
+        message = f"{selected_stock}'s closing price prediction(s): :magic_wand: {st.session_state.predictionary[selected_stock]}"
+        prediction = st.subheader(message)
+# but2, but3, but4, but5, but6, but7, but8, = gcontainer.columns([
+#     2, 2, 2, 2, 2, 2, 2])
 
 
 @st.cache_data
@@ -483,79 +506,90 @@ xr, cr, vr = defaultRanges(
 # Initialize candlestick and volume plots
 fig = go.Figure(data=candlestick, layout=stocklayout)
 fig2 = go.Figure(data=volume, layout=stocklayout)
+if st.session_state.bbandcheck:
+    fig.add_trace(bbm)
+    fig.add_trace(bbu)
+    fig.add_trace(bbl)
+fig.update_layout(showlegend=False,
+                  yaxis={'side': 'right'},
+                  title='',
+                  dragmode='pan',
+                  yaxis_title='Share Price ($)',
+                  yaxis_range=cr,
+                  xaxis_range=xr,
+                  modebar_remove=["autoScale2d", "autoscale", "lasso", "lasso2d",
+                                  "resetview",
+                                  "select2d",],
+                  autosize=False,
+                  width=700,
+                  height=350,
+                  margin=dict(
+                      l=0,
+                      r=0,
+                      b=0,
+                      t=0,
+                      pad=0
+                  ),)
+# st.plotly_chart(fig, use_container_width=True)
+fig2 = go.Figure(data=volume, layout=stocklayout)
+fig2.update_layout(yaxis_title='Number of Shares',
+                   autosize=False,
+                   yaxis={'side': 'right'},
+                   dragmode='pan',
+                   yaxis_range=vr,
+                   xaxis_range=xr,
+                   modebar_remove=["autoScale2d", "autoscale", "lasso", "lasso2d",
+                                   "resetview",
+                                   "select2d",],
+                   width=700,
+                   height=400,
+                   margin=dict(
+                       l=0,
+                       r=10,
+                       b=0,
+                       t=0,
+                       pad=4
+                   ),)
 
+rangebutton = st.radio(
+    label='', options=('1W', '1M', '6M', 'YTD', '1Y', '5Y', 'Max'),
+    horizontal=True, index=1, label_visibility='collapsed')
 
-# Sets all buttons false to ensure only 1 toggle button appears active at a time.
-def enableAllButtons():
-    st.session_state.weekon = False
-    st.session_state.monthon = False
-    st.session_state.sixmonthon = False
-    st.session_state.ytdon = False
-    st.session_state.yearon = False
-    st.session_state.fiveyearon = False
-    st.session_state.maxon = False
-
-
-def disableButton(buttonToDisable):
-    match buttonToDisable:
-        case '1W':
-            st.session_state.weekon = True
-        case '1M':
-            st.session_state.monthon = True
-        case '6M':
-            st.session_state.sixmonthon = True
-        case 'YTD':
-            st.session_state.ytdon = True
-        case '1Y':
-            st.session_state.yearon = True
-        case '5Y':
-            st.session_state.fiveyearon = True
-        case 'Max':
-            st.session_state.maxon = True
-
-
-def setAllButtonsFalse(buttonToDisable):
-    enableAllButtons()
-    disableButton(buttonToDisable)
-    st.session_state.week = False
-    st.session_state.month = False
-    st.session_state.sixmonth = False
-    st.session_state.YTD = False
-    st.session_state.year = False
-    st.session_state.fiveyear = False
-    st.session_state.Max = False
-
-
-# Create streamlit container for visualizations
-gcontainer = st.container()
-header, subinfo = gcontainer.columns([2, 4])
-change = data['Close'].iloc[-1] - data['Close'].iloc[-2]
-with header:
-    price = data['Close'].iloc[-1]
-
-    percentage = (float(data['Close'].iloc[-1] -
-                        data['Close'].iloc[-2])/abs(data['Close'].iloc[-2]))*100.00
-
-    st.metric(label=selected_stock,
-              value='${:0.2f}'.format(price),
-              delta='{:0.2f}'.format(change) +
-              ' ({:0.2f}'.format(percentage)+'%) today'
-              )
-    recentclose = data['Date'].iloc[-1].strftime('%Y-%m-%d')
-    st.caption(f'Closed: {recentclose}')
-st.markdown("""
-    <style>
-    [data-testid=column]:nth-of-type(1) [data-testid=stVerticalBlock]{
-        gap: 0rem;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-with subinfo:
-    if selected_stock in st.session_state.predictionary:
-        message = f"{selected_stock}'s closing price prediction(s): :magic_wand: {st.session_state.predictionary[selected_stock]}"
-        prediction = st.subheader(message)
-but2, but3, but4, but5, but6, but7, but8, = gcontainer.columns([
-    2, 2, 2, 2, 2, 2, 2])
+if rangebutton == '1W':
+    scalePlots(st.session_state.currentdataframe, '1W', fig, fig2)
+    st.plotly_chart(fig, use_container_width=True)
+    if st.session_state.volumecheck:
+        st.plotly_chart(fig2, use_container_width=True)
+if rangebutton == '1M':
+    scalePlots(st.session_state.currentdataframe, '1M', fig, fig2)
+    st.plotly_chart(fig, use_container_width=True)
+    if st.session_state.volumecheck:
+        st.plotly_chart(fig2, use_container_width=True)
+if rangebutton == '6M':
+    scalePlots(st.session_state.currentdataframe, '6M', fig, fig2)
+    st.plotly_chart(fig, use_container_width=True)
+    if st.session_state.volumecheck:
+        st.plotly_chart(fig2, use_container_width=True)
+if rangebutton == 'YTD':
+    scalePlots(st.session_state.currentdataframe, 'YTD', fig, fig2)
+    st.plotly_chart(fig, use_container_width=True)
+    if st.session_state.volumecheck:
+        st.plotly_chart(fig2, use_container_width=True)
+if rangebutton == '1Y':
+    scalePlots(st.session_state.currentdataframe, '1Y', fig, fig2)
+    st.plotly_chart(fig, use_container_width=True)
+    if st.session_state.volumecheck:
+        st.plotly_chart(fig2, use_container_width=True)
+if rangebutton == '5Y':
+    scalePlots(st.session_state.currentdataframe, '5Y', fig, fig2)
+    st.plotly_chart(fig, use_container_width=True)
+    if st.session_state.volumecheck:
+        st.plotly_chart(fig2, use_container_width=True)
+if rangebutton == 'Max':
+    scalePlots(st.session_state.currentdataframe, 'Max', fig, fig2)
+    st.plotly_chart(fig, use_container_width=True)
+    if st.session_state.volumecheck:
+        st.plotly_chart(fig2, use_container_width=True)
 
 # Recent News Section
 # summarizer = pipeline("summarization")
@@ -630,105 +664,6 @@ bbandcheck = st.checkbox(label="Display Bollinger bands",
 volumecheck = st.checkbox(label="Display volume plot",
                           key='volumecheck')
 st.divider()
-
-# Fill graph container to patch glitch
-with but2:
-    week = sbutton(label='1W', key='week', on_click=setAllButtonsFalse,
-                   disabled=st.session_state.weekon, args=('1W',))
-with but3:
-    month = sbutton(label='1M', key='month',
-                    on_click=setAllButtonsFalse, disabled=st.session_state.monthon, args=('1M',))
-with but4:
-    sixmonth = sbutton(label='6M', key='sixmonth',
-                       on_click=setAllButtonsFalse, disabled=st.session_state.sixmonthon, args=('6M',))
-with but5:
-    YTD = sbutton(label='YTD', key='YTD',
-                  on_click=setAllButtonsFalse, disabled=st.session_state.ytdon, args=('YTD',))
-with but6:
-    year = sbutton(label='1Y', key='year',
-                   on_click=setAllButtonsFalse, disabled=st.session_state.yearon, args=('1Y',))
-with but7:
-    fiveyear = sbutton(label='5Y', key='fiveyear',
-                       on_click=setAllButtonsFalse, disabled=st.session_state.fiveyearon, args=('5Y',))
-with but8:
-    Max = sbutton(label='Max', key='Max',
-                  on_click=setAllButtonsFalse, disabled=st.session_state.maxon, args=('Max',))
-
-if week:
-    st.session_state.currentlayoutbutton = '1W'
-    xr, cr, vr = defaultRanges(st.session_state.currentdataframe, '1W')
-elif month:
-    st.session_state.currentlayoutbutton = '1M'
-    xr, cr, vr = defaultRanges(st.session_state.currentdataframe, '1M')
-elif sixmonth:
-    st.session_state.currentlayoutbutton = '6M'
-    xr, cr, vr = defaultRanges(st.session_state.currentdataframe, '6M')
-elif YTD:
-    st.session_state.currentlayoutbutton = 'YTD'
-    xr, cr, vr = defaultRanges(st.session_state.currentdataframe, 'YTD')
-elif year:
-    st.session_state.currentlayoutbutton = '1Y'
-    xr, cr, vr = defaultRanges(st.session_state.currentdataframe, '1Y')
-elif fiveyear:
-    st.session_state.currentlayoutbutton = '5Y'
-    xr, cr, vr = defaultRanges(st.session_state.currentdataframe, '5Y')
-elif Max:
-    st.session_state.currentlayoutbutton = 'Max'
-    xr, cr, vr = defaultRanges(st.session_state.currentdataframe, 'Max')
-
-if st.session_state.bbandcheck:
-    fig.add_trace(bbm)
-    fig.add_trace(bbu)
-    fig.add_trace(bbl)
-fig.update_layout(showlegend=False,
-                  yaxis={'side': 'right'},
-                  title='',
-                  dragmode='pan',
-                  yaxis_title='Share Price ($)',
-                  yaxis_range=cr,
-                  xaxis_range=xr,
-                  modebar_remove=["autoScale2d", "autoscale", "lasso", "lasso2d",
-                                  "resetview",
-                                  "select2d",],
-                  autosize=False,
-                  width=700,
-                  height=350,
-                  margin=dict(
-                      l=0,
-                      r=0,
-                      b=0,
-                      t=0,
-                      pad=0
-                  ),)
-gcontainer.plotly_chart(fig, use_container_width=True)
-if st.session_state.volumecheck:
-    fig2 = go.Figure(data=volume, layout=stocklayout)
-    fig2.update_layout(title='Volume', yaxis_title='Number of Shares',
-                       autosize=False,
-                       dragmode='pan',
-                       yaxis_range=vr,
-                       xaxis_range=xr,
-                       modebar_remove=["autoScale2d", "autoscale", "lasso", "lasso2d",
-                                       "resetview",
-                                       "select2d",],
-                       width=700,
-                       height=400,
-                       margin=dict(
-                           l=0,
-                           r=10,
-                           b=0,
-                           t=75,
-                           pad=4
-                       ),)
-    gcontainer.plotly_chart(fig2, use_container_width=True)
-# W, M, SM, YTD, Y, FY, Max = st.tabs(
-#     ['1W', '1M', '6M', 'YTD', '1Y', '5Y', 'Max'])
-# with W:
-#     st.plotly_chart(fig, use_container_width=True)
-
-# with M:
-#     st.plotly_chart(fig, use_container_width=True)
-
 
 # Credits/Links
 badge(type="github", name="aidanaalund/predticker")
