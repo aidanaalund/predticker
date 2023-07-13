@@ -701,7 +701,8 @@ if info:
 # if 'longBusinessSummary' in info:
 if info:
     with st.expander(f"{name}'s summary"):
-        label = labelCompany(info['longBusinessSummary'])
+        # label = labelCompany(info['longBusinessSummary'])
+        label = labelCompany(info)
         data_df = pd.DataFrame(
             {
                 "Tag": [
