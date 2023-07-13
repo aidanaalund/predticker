@@ -8,5 +8,5 @@ scikit-learn
 tensorflow
 nltk
 transformers
-newspaper
+newspaper3k
 newsapi
