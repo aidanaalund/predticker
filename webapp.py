@@ -27,9 +27,9 @@ from keras.models import Sequential
 from keras.layers import Dense, LSTM, Dropout
 
 # News/NLP imports
-# from transformers import pipeline
+from transformers import pipeline
 import json
-# from newspaper import Article
+from newspaper import Article
 from newsapi import NewsApiClient
 import nltk
 import re
@@ -767,13 +767,13 @@ for ar in st.session_state.newsdictionary[f'{selected_stock}']:
             # print(type(data_df)) # list
             stripped = ar['publishedAt'].split("T", 1)[0]
             st.caption(f"{ar['description']}")
-            # st.caption(f"{fullarticle.text}")
-            # sentbutton = st.button(label='Generate an analysis...',
-            #                        key=url)
-            # if sentbutton:
-            #     sentiment_pipeline = pipeline("sentiment-analysis")
-            #     sent = sentiment_pipeline(ar['title'])
-            #     st.text(sent[0]['label'])
+            st.caption(f"{fullarticle.text}")
+            sentbutton = st.button(label='Generate an analysis...',
+                                   key=url)
+            if sentbutton:
+                sentiment_pipeline = pipeline("sentiment-analysis")
+                sent = sentiment_pipeline(ar['title'])
+                st.text(sent[0]['label'])
             st.caption(f'[Read at {ar["source"]["name"]}](%s)' % url)
             if ar["author"]:
                 st.caption(f'Written by {ar["author"]}')
