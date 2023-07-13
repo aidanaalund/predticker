@@ -1,7 +1,7 @@
 streamlit-extras
 pandas
 pandas_ta
-yfinance
+yfinance==0.2.22
 plotly
 numpy
 scikit-learn

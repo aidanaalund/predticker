@@ -685,7 +685,7 @@ def labelCompany(text):
     return top_industries[0]
 
 
-# @st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False)
 def fetchInfo(ticker):
     info = yf.Ticker(ticker).get_info()
     return info
@@ -693,7 +693,6 @@ def fetchInfo(ticker):
 
 info = fetchInfo(selected_stock)
 st.caption(f'{info.keys()}')
-st.caption(f'{dir(info)}')
 name = info['longName']
 if info:
     if 'longName' in info:
