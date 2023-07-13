@@ -692,6 +692,7 @@ def fetchInfo(ticker):
 
 
 info = fetchInfo(selected_stock)
+print(info)
 if info:
     if 'longName' in info:
         name = info['longName']
