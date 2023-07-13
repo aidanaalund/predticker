@@ -1,7 +1,12 @@
 streamlit-extras
 pandas
+pandas_ta
 yfinance
 plotly
 numpy
 scikit-learn
 tensorflow
+nltk
+transformers
+newspaper
+newsapi
