@@ -692,10 +692,10 @@ def fetchInfo(ticker):
 
 
 info = fetchInfo(selected_stock)
+name = selected_stock
 if info:
     if 'longName' in info:
         name = info['longName']
-else:
     name = selected_stock
 if 'longBusinessSummary' in info:
     with st.expander(f"{name}'s summary"):
