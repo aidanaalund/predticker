@@ -1,20 +1,22 @@
+# Streamlit imports
+import streamlit as st
+from streamlit_extras.badges import badge as badge
+
+# Data scraping/visualization
+import pandas as pd
+import pandas_ta as ta
+import requests
+import yfinance as yf
+from plotly import graph_objs as go
+import numpy as np
 from datetime import date
 from collections import deque
 from datetime import datetime
 import datetime
+# from sklearn.linear_model import LinearRegression
+# import pwlf
 
-import streamlit as st
-# from streamlit_extras.stateful_button import button as sbutton
-from streamlit_extras.badges import badge as badge
-
-import pandas as pd
-import pandas_ta as ta
-import requests
-
-import yfinance as yf
-from plotly import graph_objs as go
-import numpy as np
-
+# Prediction imports
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
@@ -24,10 +26,15 @@ import keras_tuner
 from keras.models import Sequential
 from keras.layers import Dense, LSTM, Dropout
 
-# from transformers import pipeline
+# News/NLP imports
+from transformers import pipeline
 import json
 # from newspaper import Article
 from newsapi import NewsApiClient
+import nltk
+import re
+from heapq import nlargest
+# import torch
 
 START = "2016-01-01"
 TODAY = date.today().strftime("%Y-%m-%d")
@@ -45,7 +52,7 @@ with title:
     st.title(":crystal_ball: Predticker")
 
 st.caption("A magic stock dashboard")
-
+# nltk.download('punkt')
 if 'stocks' not in st.session_state:
     st.session_state.stocks = set(["AAPL", "GOOG", "TSLA", "MSFT"])
 if 'predictiontext' not in st.session_state:
@@ -56,26 +63,10 @@ if 'predictionary' not in st.session_state:
     st.session_state.predictionary = {}
 if 'newsdictionary' not in st.session_state:
     st.session_state.newsdictionary = {}
-if 'weekon' not in st.session_state:
-    st.session_state.weekon = False
-if 'monthon' not in st.session_state:
-    st.session_state.monthon = True
-if 'sixmonthon' not in st.session_state:
-    st.session_state.sixmonthon = False
-if 'ytdon' not in st.session_state:
-    st.session_state.ytdon = False
-if 'yearon' not in st.session_state:
-    st.session_state.yearon = False
-if 'fiveyearon' not in st.session_state:
-    st.session_state.fiveyearon = False
-if 'maxon' not in st.session_state:
-    st.session_state.maxon = False
 if 'metrics' not in st.session_state:
     st.session_state.metrics = ''
 if 'hptuning' not in st.session_state:
     st.session_state.hptuning = False
-if 'dataframecheck' not in st.session_state:
-    st.session_state.dataframecheck = False
 if 'costfunctioncheck' not in st.session_state:
     st.session_state.costfunctioncheck = False
 if 'bbandcheck' not in st.session_state:
@@ -86,6 +77,11 @@ if 'modelhistory' not in st.session_state:
     st.session_state.modelhistory = None
 if 'currentstockmetadata' not in st.session_state:
     st.session_state.currentstockmetadata = None
+if 'newgraph' not in st.session_state:
+    st.session_state.newgraph = True
+if 'currentdataframe' not in st.session_state:
+    # make this set to what the selector is currently set to
+    st.session_state.currentdataframe = None
 # User Input
 col1, col2, col3 = st.columns([6, 3, 3])
 
@@ -108,10 +104,15 @@ def addstock():
                 st.session_state.textinput = ''
 
 
+def newgraph():
+    st.session_state.newgraph = True
+
+
 with col1:
     selected_stock = st.selectbox("Select a ticker from your list:",
                                   st.session_state.stocks,
-                                  key='selectbox')
+                                  key='selectbox',
+                                  on_change=newgraph)
 with col2:
     newstock = st.text_input(label='Add a ticker to the list...',
                              placeholder="Type a ticker to add",
@@ -132,7 +133,7 @@ def add_indicators(df):
     df.ta.bbands(length=20, append=True)
     df['upper_band'], df['middle_band'], df['lower_band'], x, y = ta.bbands(
         df['Adj Close'], timeperiod=20)
-
+    # Adjs close will be the most accurate!!!
     df['Target'] = df['Adj Close']-df.Open
     df['Target'] = df['Target'].shift(-1)
 
@@ -140,6 +141,16 @@ def add_indicators(df):
                          > 0 else 0 for i in range(len(df))]
 
     df['TargetNextClose'] = df['Adj Close'].shift(-1)
+    # Returns
+    # Specify the length. Default is 20
+    df.ta.log_return(close=df['Adj Close'], cumulative=True, append=True)
+    df.ta.percent_return(close=df['Adj Close'], cumulative=True, append=True)
+    # print(help(ta.log_return))
+    # print(help(ta.percent_return))
+    # PLR
+    # Trading signal (piece-wise linear regression)
+
+    # Naive Forecast, aka the previous day's price
 
     df.dropna(inplace=True)
 
@@ -149,17 +160,12 @@ def load_data(ticker):
     data = yf.download(ticker, START, TODAY)
     data.reset_index(inplace=True)
     data['Date'] = pd.to_datetime(data['Date'])
-    st.session_state.currentdataframe = data
     add_indicators(data)
     return data
 
 
 data = load_data(selected_stock)
-
-if 'currentdataframe' not in st.session_state:
-    # make this set to what the selector is currently set to
-    st.session_state.currentdataframe = data
-
+st.session_state.currentdataframe = data
 # DATA PREPROCESSING
 # grab first and last observations from df.date and make a continuous date range from that
 dt_all = pd.date_range(
@@ -297,7 +303,7 @@ def predict(stockdataframe):
 
     scaler = MinMaxScaler()
     # Fit the scaler so it understands what is going on
-    # TODO: does not scaling test and train individually mess things up?
+    # TODO: Scale test and train individually!
     stockdataframe['scaled_close'] = scaler.fit_transform(
         np.expand_dims(stockdataframe['Close'].values, axis=1))
 
@@ -427,8 +433,8 @@ with subinfo:
     if selected_stock in st.session_state.predictionary:
         message = f"{selected_stock}'s closing price prediction(s): :magic_wand: {st.session_state.predictionary[selected_stock]}"
         prediction = st.subheader(message)
-# but2, but3, but4, but5, but6, but7, but8, = gcontainer.columns([
-#     2, 2, 2, 2, 2, 2, 2])
+
+# TODO: This method is fundamentally flawed. Fix it.
 
 
 @st.cache_data
@@ -499,10 +505,6 @@ def scalePlots(df, period, plotly1, plotly2):
                           yaxis_range=vr,)
 
 
-xr, cr, vr = defaultRanges(
-    data, '1M')
-
-
 # Initialize candlestick and volume plots
 fig = go.Figure(data=candlestick, layout=stocklayout)
 fig2 = go.Figure(data=volume, layout=stocklayout)
@@ -515,8 +517,6 @@ fig.update_layout(showlegend=False,
                   title='',
                   dragmode='pan',
                   yaxis_title='Share Price ($)',
-                  yaxis_range=cr,
-                  xaxis_range=xr,
                   modebar_remove=["autoScale2d", "autoscale", "lasso", "lasso2d",
                                   "resetview",
                                   "select2d",],
@@ -536,8 +536,6 @@ fig2.update_layout(yaxis_title='Number of Shares',
                    autosize=False,
                    yaxis={'side': 'right'},
                    dragmode='pan',
-                   yaxis_range=vr,
-                   xaxis_range=xr,
                    modebar_remove=["autoScale2d", "autoscale", "lasso", "lasso2d",
                                    "resetview",
                                    "select2d",],
@@ -551,9 +549,16 @@ fig2.update_layout(yaxis_title='Number of Shares',
                        pad=4
                    ),)
 
+
 rangebutton = st.radio(
-    label='', options=('1W', '1M', '6M', 'YTD', '1Y', '5Y', 'Max'),
+    label='Range Selector', options=('1W', '1M', '6M', 'YTD', '1Y', '5Y', 'Max'),
     horizontal=True, index=1, label_visibility='collapsed')
+
+if st.session_state.newgraph:
+    string = rangebutton
+    scalePlots(st.session_state.currentdataframe, string, fig, fig2)
+    st.session_state.newgraph = False
+
 
 if rangebutton == '1W':
     scalePlots(st.session_state.currentdataframe, '1W', fig, fig2)
@@ -591,18 +596,130 @@ if rangebutton == 'Max':
     if st.session_state.volumecheck:
         st.plotly_chart(fig2, use_container_width=True)
 
-# Recent News Section
+# Recent News Section!
 # summarizer = pipeline("summarization")
-st.divider()
 newsheader, newsbutton = st.columns([1, 3])
-with newsheader:
-    st.subheader('Recent News:')
-info = yf.Ticker(selected_stock).info
+
+# Label a company
+
+# insurance_keywords = ['actuary', 'claims', 'coverage', 'deductible', 'policyholder', 'premium', 'underwriter', 'risk assessment', 'insurable interest', 'loss ratio', 'reinsurance', 'actuarial tables', 'property damage', 'liability', 'flood insurance', 'term life insurance', 'whole life insurance', 'health insurance', 'auto insurance', 'homeowners insurance', 'marine insurance', 'crop insurance', 'catastrophe insurance', 'umbrella insurance',
+#                       'pet insurance', 'travel insurance', 'professional liability insurance', 'disability insurance', 'long-term care insurance', 'annuity', 'pension plan', 'group insurance', 'insurtech', 'insured', 'insurer', 'subrogation', 'adjuster', 'third-party administrator', 'excess and surplus lines', 'captives', 'workers compensation', 'insurance fraud', 'health savings account', 'health maintenance organization', 'preferred provider organization']
+
+finance_keywords = ['asset', 'liability', 'equity', 'capital', 'portfolio', 'dividend', 'financial statement', 'balance sheet', 'income statement', 'cash flow statement', 'statement of retained earnings', 'financial ratio', 'valuation', 'bond', 'stock', 'mutual fund', 'exchange-traded fund', 'hedge fund', 'private equity', 'venture capital', 'mergers and acquisitions', 'initial public offering', 'secondary market',
+                    'primary market', 'securities', 'derivative', 'option', 'futures', 'forward contract', 'swaps', 'commodities', 'credit rating', 'credit score', 'credit report', 'credit bureau', 'credit history', 'credit limit', 'credit utilization', 'credit counseling', 'credit card', 'debit card', 'ATM', 'bankruptcy', 'foreclosure', 'debt consolidation', 'taxes', 'tax return', 'tax deduction', 'tax credit', 'tax bracket', 'taxable income']
+
+# banking_capital_markets_keywords = ['bank', 'credit union', 'savings and loan association', 'commercial bank', 'investment bank', 'retail bank', 'wholesale bank', 'online bank', 'mobile banking', 'checking account', 'savings account', 'money market account', 'certificate of deposit', 'loan', 'mortgage', 'home equity loan', 'line of credit', 'credit card', 'debit card', 'ATM', 'automated clearing house', 'wire transfer', 'ACH',
+#                                     'SWIFT', 'international banking', 'foreign exchange', 'forex', 'currency exchange', 'central bank', 'Federal Reserve', 'interest rate', 'inflation', 'deflation', 'monetary policy', 'fiscal policy', 'quantitative easing', 'securities', 'stock', 'bond', 'mutual fund', 'exchange-traded fund', 'hedge fund', 'private equity', 'venture capital', 'investment management', 'portfolio management', 'wealth management', 'financial planning']
+
+healthcare_life_sciences_keywords = ['medical', 'pharmaceutical', 'pharmaceuticals', 'biotechnology', 'clinical trial', 'FDA', 'healthcare provider', 'healthcare plan', 'healthcare insurance', 'patient', 'doctor', 'nurse', 'pharmacist', 'hospital', 'clinic',
+                                     'healthcare system', 'healthcare policy', 'public health', 'healthcare IT', 'electronic health record', 'telemedicine', 'personalized medicine', 'genomics', 'proteomics', 'clinical research', 'drug development', 'drug discovery', 'medicine', 'health']
+
+law_keywords = ['law', 'legal', 'attorney', 'lawyer', 'litigation', 'arbitration', 'dispute resolution', 'contract law', 'intellectual property',
+                'corporate law', 'labor law', 'tax law', 'real estate law', 'environmental law', 'criminal law', 'family law', 'immigration law', 'bankruptcy law']
+
+# sports_keywords = ['sports', 'football', 'basketball', 'baseball', 'hockey', 'soccer', 'golf', 'tennis', 'olympics', 'athletics',
+#                    'coaching', 'sports management', 'sports medicine', 'sports psychology', 'sports broadcasting', 'sports journalism', 'esports', 'fitness']
+
+media_keywords = ['media', 'entertainment', 'film', 'television', 'radio', 'music', 'news', 'journalism', 'publishing', 'public relations',
+                  'advertising', 'marketing', 'social media', 'digital media', 'animation', 'graphic design', 'web design', 'video production']
+
+manufacturing_keywords = ['manufacturing', 'production', 'assembly', 'logistics', 'supply chain', 'quality control', 'lean manufacturing', 'six sigma', 'industrial engineering',
+                          'process improvement', 'machinery', 'automation', 'aerospace', 'automotive', 'chemicals', 'construction materials', 'consumer goods', 'electronics', 'semiconductors']
+
+automotive_keywords = ['automotive', 'cars', 'trucks', 'SUVs', 'electric vehicles', 'hybrid vehicles', 'autonomous vehicles', 'car manufacturing',
+                       'automotive design', 'car dealerships', 'auto parts', 'vehicle maintenance', 'car rental', 'fleet management', 'telematics']
+
+telecom_keywords = ['telecom', 'telecommunications', 'wireless', 'networks', 'internet', 'broadband', 'fiber optics', '5G', 'telecom infrastructure',
+                    'telecom equipment', 'VoIP', 'satellite communications', 'mobile devices', 'smartphones', 'telecom services', 'telecom regulation', 'telecom policy']
+# other categories to add: agriculture, energy, construction
+
+agriculture_keywords = ['tractors', 'agriculture',
+                        'harvesters', 'machinery', 'nutrient', 'turf', 'forestry']
+
+information_technology_keywords = [
+    "Artificial intelligence", "Machine learning", "Data Science", "Big Data", "Cloud Computing",
+    "Cybersecurity", "Information security", "Network security", "Blockchain", "Cryptocurrency",
+    "Internet of things", "IoT", "Web development", "Mobile development", "Frontend development",
+    "Backend development", "Software engineering", "Software development", "Programming",
+    "Database", "Data analytics", "Business intelligence", "DevOps", "Agile", "Scrum",
+    "Product management", "Project management", "IT consulting", "IT service management",
+    "ERP", "CRM", "SaaS", "PaaS", "IaaS", "Virtualization", "Artificial reality", "AR", "Virtual reality",
+    "VR", "Gaming", "E-commerce", "Digital marketing", "SEO", "SEM", "Content marketing",
+    "Social media marketing", "User experience", "UX design", "UI design", "Cloud-native",
+    "Microservices", "Serverless", "Containerization", "Wearables", "Smartphone", "Cloud", "Electric Vehicles"
+]
+
+industries = {
+    # 'Insurance': insurance_keywords,
+    'Finance': finance_keywords,
+    # 'Banking': banking_capital_markets_keywords,
+    'Healthcare': healthcare_life_sciences_keywords,
+    'Legal': law_keywords,
+    'Agriculture': agriculture_keywords,
+    # 'Sports': sports_keywords,
+    'Media': media_keywords,
+    'Manufacturing': manufacturing_keywords,
+    'Automotive': automotive_keywords,
+    'Telecom': telecom_keywords,
+    'Technology': information_technology_keywords
+}
+
+
+def labelCompany(text):
+    # Count the number of occurrences of each keyword in the text for each industry
+    counts = {}
+    for industry, keywords in industries.items():
+        count = sum([1 for keyword in keywords if re.search(
+            r"\b{}\b".format(keyword), text, re.IGNORECASE)])
+        counts[industry] = count
+
+    # Get the top industries based on their counts
+    top_industries = nlargest(2, counts, key=counts.get)
+
+    # # If only one industry was found, return it
+    # if len(top_industries) == 1:
+    #     return top_industries[0]
+    # # If two industries were found, return them both
+    # else:
+    return top_industries[0]
+
+
+@st.cache_data(show_spinner=False)
+def fetchInfo(ticker):
+    info = yf.Ticker(ticker).info
+    return info
+
+
+info = fetchInfo(selected_stock)
 if info:
     if 'longName' in info:
         name = info['longName']
 else:
     name = selected_stock
+if 'longBusinessSummary' in info:
+    with st.expander(f"{name}'s summary"):
+        label = labelCompany(info['longBusinessSummary'])
+        data_df = pd.DataFrame(
+            {
+                "Tag": [
+                    label,
+                ],
+            }
+        )
+        st.data_editor(
+            data_df,
+            column_config={
+                "labels": st.column_config.ListColumn(
+                    "Tags",
+                    width="medium",
+                ),
+            },
+            hide_index=True,)
+        st.caption(info['longBusinessSummary'])
+else:
+    st.error(f"{name}'s summary not available")
+st.divider()
+st.subheader('Recent News:')
 
 
 @st.cache_data(show_spinner=False)
@@ -636,13 +753,27 @@ def fetchNews(name):
 
 if f'{selected_stock}' not in st.session_state.newsdictionary:
     st.session_state.newsdictionary[f'{selected_stock}'] = fetchNews(name)
+
 # create dropdowns for each article
 for ar in st.session_state.newsdictionary[f'{selected_stock}']:
     try:
         with st.expander(ar['title']):
             url = ar["url"]
+            # fullarticle = Article(url)
+            # fullarticle.download()
+            # fullarticle.parse()
+            # fullarticle.nlp()
+            # data_df = fullarticle.keywords
+            # print(type(data_df)) # list
             stripped = ar['publishedAt'].split("T", 1)[0]
             st.caption(f"{ar['description']}")
+            # st.caption(f"{fullarticle.text}")
+            sentbutton = st.button(label='Generate an analysis...',
+                                   key=url)
+            if sentbutton:
+                sentiment_pipeline = pipeline("sentiment-analysis")
+                sent = sentiment_pipeline(ar['title'])
+                st.text(sent[0]['label'])
             st.caption(f'[Read at {ar["source"]["name"]}](%s)' % url)
             if ar["author"]:
                 st.caption(f'Written by {ar["author"]}')
