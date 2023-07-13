@@ -30,7 +30,8 @@ from keras.layers import Dense, LSTM, Dropout
 from transformers import pipeline
 import json
 from newspaper import Article
-from newsapi import NewsApiClient
+# from newsapi import NewsApiClient
+import newsapi
 import nltk
 import re
 from heapq import nlargest
@@ -767,7 +768,7 @@ for ar in st.session_state.newsdictionary[f'{selected_stock}']:
             # print(type(data_df)) # list
             stripped = ar['publishedAt'].split("T", 1)[0]
             st.caption(f"{ar['description']}")
-            st.caption(f"{fullarticle.text}")
+            # st.caption(f"{fullarticle.text}")
             sentbutton = st.button(label='Generate an analysis...',
                                    key=url)
             if sentbutton:
