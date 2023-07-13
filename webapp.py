@@ -692,8 +692,6 @@ def fetchInfo(ticker):
 
 
 info = fetchInfo(selected_stock)
-st.caption(f'{info.keys()}')
-name = info['longName']
 if info:
     if 'longName' in info:
         name = info['longName']
@@ -730,7 +728,6 @@ def fetchNews(name):
     try:
 
         # Init
-        # newsapi = NewsApiClient(api_key='100a9812d1544d1bb65ae12e83c14ce5')
         query_params = {
             'q': f'{name}',
             "sortBy": "relevancy",
