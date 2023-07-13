@@ -694,10 +694,12 @@ def fetchInfo(ticker):
 info = fetchInfo(selected_stock)
 name = selected_stock
 if info:
-    if 'longName' in info:
-        name = info['longName']
-    name = selected_stock
-if 'longBusinessSummary' in info:
+    # if 'longName' in info:
+    #     name = info['longName']
+    # name = selected_stock
+    name = info
+# if 'longBusinessSummary' in info:
+if info:
     with st.expander(f"{name}'s summary"):
         label = labelCompany(info['longBusinessSummary'])
         data_df = pd.DataFrame(
