@@ -7,6 +7,5 @@ numpy
 scikit-learn
 tensorflow
 nltk
-transformers
 newspaper3k
 newsapi
