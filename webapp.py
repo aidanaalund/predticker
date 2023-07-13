@@ -692,6 +692,7 @@ def fetchInfo(ticker):
 
 
 info = fetchInfo(selected_stock)
+st.caption(f'{info.keys()}')
 name = info['longName']
 if info:
     if 'longName' in info:
