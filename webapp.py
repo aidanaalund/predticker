@@ -7,6 +7,8 @@ import pandas as pd
 import pandas_ta as ta
 import requests
 import yfinance as yf
+# yesg is currently broken
+# import yesg
 from plotly import graph_objs as go
 import numpy as np
 from datetime import date
@@ -16,7 +18,7 @@ import datetime
 # from sklearn.linear_model import LinearRegression
 # import pwlf
 
-# Prediction imports
+# ML imports
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
@@ -46,7 +48,7 @@ st.set_page_config(page_title='Predticker', page_icon=':magic_wand:', layout="ce
                    initial_sidebar_state="auto", menu_items={
                        'Get Help': 'https://github.com/aidanaalund/predticker',
                        'Report a bug': "https://github.com/aidanaalund/predticker",
-                       'About': "A dashboard that speculates future values of publicy traded US companies using an LSTM neural network model. Check out the repo for more information on how this works! Stock data pulled may not be accurate/up to date and this is not financial advice."
+                       'About': "A dashboard that creates a trading signal based on a neural network and performs NLP analysis on relevant news and ESG stats. Check out the repo for more information on how this works! Data fetched may not be accurate/up to date and this is not financial advice."
                    })
 title, loadingtext = st.columns([1, 1])
 with title:
@@ -86,7 +88,7 @@ if 'currentdataframe' not in st.session_state:
 # User Input
 col1, col2, col3 = st.columns([6, 3, 3])
 
-# Callback that adds an inputted stock string to a list of stocks in the state
+# Adds an inputted stock string to a list of stocks in the state
 # Checks for an invalid ticker by attempting to get the first value in a column
 
 
@@ -103,6 +105,8 @@ def addstock():
                 st.error(
                     f'Error: "{st.session_state.textinput}" is an invalid ticker.')
                 st.session_state.textinput = ''
+
+# Sets a streamlit state boolean to true, making the graph render a new stock's data set.
 
 
 def newgraph():
@@ -122,38 +126,70 @@ with col2:
                              key='textinput',
                              help='Please input a valid US ticker.')
 
-# Load correctly formatted data in a pandas dataframe
+# Load correctly formatted data in a pandas dataframe.
 
 
 def add_indicators(df):
     df['SMA'] = ta.sma(df.Close, length=25)
-    df['EMA'] = ta.ema(df.Close, length=25)
-    df['RSI'] = ta.rsi(df.Close, length=25)
+    df['EMA12'] = ta.ema(df.Close, length=10)
+    df['EMA26'] = ta.ema(df.Close, length=30)
+    df['RSI'] = ta.rsi(df.Close, length=14)
+    # returns multiple values
+    # df['ADX'], df['DMP'], df['DMN'] = ta.adx(
+    #     df.High, df.Low, df.Close, length=14)
     df['WILLR'] = ta.willr(df.High, df.Low, df.Close, length=25)
+    # MACD stuff (without TALib!)
+    macd = df['EMA26']-df['EMA12']
+    macds = macd.ewm(span=9, adjust=False, min_periods=9).mean()
+    macdh = macd - macds
+    df['MACD'] = df.index.map(macd)
+    df['MACDH'] = df.index.map(macdh)
+    df['MACDS'] = df.index.map(macds)
     # Bollinger Bands
     df.ta.bbands(length=20, append=True)
-    df['upper_band'], df['middle_band'], df['lower_band'], x, y = ta.bbands(
+    ta.bbands(
         df['Adj Close'], timeperiod=20)
-    # Adjs close will be the most accurate!!!
-    df['Target'] = df['Adj Close']-df.Open
-    df['Target'] = df['Target'].shift(-1)
+    # This is a target based off of the next day's increase
+    # df['Target'] = df['Adj Close']-df.Open
+    # df['Target'] = df['Target'].shift(-1)
 
-    df['TargetClass'] = [1 if df.Target[i]
-                         > 0 else 0 for i in range(len(df))]
+    # df['TargetClass'] = [1 if df.Target[i]
+    #                      > 0 else 0 for i in range(len(df))]
 
-    df['TargetNextClose'] = df['Adj Close'].shift(-1)
+    # df['TargetNextClose'] = df['Adj Close'].shift(-1)
     # Returns
-    # Specify the length. Default is 20
+    # Log return is defined as ln(d2/d1)
+    print(help(ta.log_return))
+    # Starts at day 1
     df.ta.log_return(close=df['Adj Close'], cumulative=True, append=True)
+    # Day over day log return
+    df.ta.log_return(close=df['Adj Close'], cumulative=False, append=True)
+    df['Target'] = np.where(df['LOGRET_1'] > 0, 1, 0)
+    # df['return_'+benchmark] = 1
+    # Percent return (now/day1)
     df.ta.percent_return(close=df['Adj Close'], cumulative=True, append=True)
-    # print(help(ta.log_return))
-    # print(help(ta.percent_return))
-    # PLR
-    # Trading signal (piece-wise linear regression)
 
-    # Naive Forecast, aka the previous day's price
+    # Create features for the ML model
+    df['EMA_12_EMA_26'] = np.where(df['EMA12'] > df['EMA26'], 1, -1)
+    df['Close_EMA_12'] = np.where(df['Close'] > df['EMA12'], 1, -1)
+    df['MACDS_MACD'] = np.where(df['MACDS'] > df['MACD'], 1, -1)
 
-    df.dropna(inplace=True)
+    # TODO: PLR
+    # def bestSegments(close):
+
+    # TODO: compute a threshold for the stock
+
+    # TODO: make the PLR
+    # def plr(close):
+
+    # make a line between the start and end
+    # for each point in the close vs date series, calculate euclidean distance between L
+
+    # TODO: Trading signal (piece-wise linear regression)
+
+    # TODO: Naive Forecast, aka the previous day's price
+    # TODO: check if this is needed for preprocessing!
+    # df.dropna(inplace=True)
 
 
 @st.cache_data(show_spinner=False)
@@ -687,11 +723,16 @@ def labelCompany(text):
 
 @st.cache_data(show_spinner=False)
 def fetchInfo(ticker):
-    info = yf.Ticker(ticker).get_info()
+    ticker = yf.Ticker(ticker)
+    info = ticker.get_info()
+    # Currently throws a 401
+    # esgscores = yesg.get_esg_short(f'{selected_stock}').to_string()
     return info
 
 
 info = fetchInfo(selected_stock)
+# st.caption(esgscores)
+# st.caption(f'{info["sustainability"]}')
 if info:
     if 'longName' in info:
         name = info['longName']
@@ -726,14 +767,16 @@ st.subheader('Recent News:')
 @st.cache_data(show_spinner=False)
 def fetchNews(name):
     try:
-
+        # TODO: query results in good articles, but further tuning may be needed
         # Init
         query_params = {
             'q': f'{name}',
             "sortBy": "relevancy",
             "apiKey": "4dbc17e007ab436fb66416009dfb59a8",
             "page": 1,
-            # 'domains': TODO: get reputable sources
+            "sources": "cnn,reuters,cbs-news,usa-today,the-washington-post,the-wall-street-journal,associated-press,financial-times,newsweek",
+            "domains": 'gizmodo.com,forbes.com/business/,bloomberg.com,businessinsider.com',
+            # "excludeDomains":
             "pageSize": 3,
             "language": "en"
         }
@@ -772,6 +815,7 @@ for ar in st.session_state.newsdictionary[f'{selected_stock}']:
                                    key=url)
             if sentbutton:
                 sentiment_pipeline = pipeline("sentiment-analysis")
+                # TODO: improve pipeline, and get full article contents
                 sent = sentiment_pipeline(ar['title'])
                 st.text(sent[0]['label'])
             st.caption(f'[Read at {ar["source"]["name"]}](%s)' % url)
@@ -802,7 +846,7 @@ url = "https://www.streamlit.io"
 st.caption('Made with [Streamlit](%s)' % url)
 
 
-# HTML to hide the 'Made with streamlit' text
+# HTML to hide the default 'Made with streamlit' text
 hide_menu = """
 <style>
 footer{
