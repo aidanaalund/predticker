@@ -772,7 +772,7 @@ def fetchNews(name):
         query_params = {
             'q': f'{name}',
             "sortBy": "relevancy",
-            "apiKey": "4dbc17e007ab436fb66416009dfb59a8",
+            "apiKey": "100a9812d1544d1bb65ae12e83c14ce5",
             "page": 1,
             "sources": "cnn,reuters,cbs-news,usa-today,the-washington-post,the-wall-street-journal,associated-press,financial-times,newsweek",
             "domains": 'gizmodo.com,forbes.com/business/,bloomberg.com,businessinsider.com',
