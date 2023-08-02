@@ -7,57 +7,38 @@ import pandas as pd
 import pandas_ta as ta
 import requests
 import yfinance as yf
-# yesg is currently broken
-# import yesg
 from plotly import graph_objs as go
 import numpy as np
 from datetime import date
 from collections import deque
 from datetime import datetime
 import datetime
-# from sklearn.linear_model import LinearRegression
-# import pwlf
-
-# ML imports
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.model_selection import train_test_split
-import tensorflow as tf
-import keras
-from keras import metrics
-import keras_tuner
-from keras.models import Sequential
-from keras.layers import Dense, LSTM, Dropout
 
 # News/NLP imports
 from transformers import pipeline
 import json
 from newspaper import Article
-# from newsapi import NewsApiClient
 import newsapi
 import nltk
 import re
 from heapq import nlargest
-# import torch
 
 START = "2016-01-01"
 TODAY = date.today().strftime("%Y-%m-%d")
 YEAR = int(date.today().strftime("%Y"))
 STARTOFYEAR = "f'{YEAR}-01-01'"
 
-st.set_page_config(page_title='Predticker', page_icon=':magic_wand:', layout="centered",
+
+st.set_page_config(page_title='ESGParrot', page_icon=':parrot:', layout="centered",
                    initial_sidebar_state="auto", menu_items={
                        'Get Help': 'https://github.com/aidanaalund/predticker',
                        'Report a bug': "https://github.com/aidanaalund/predticker",
-                       'About': "A dashboard that creates a trading signal based on a neural network and performs NLP analysis on relevant news and ESG stats. Check out the repo for more information on how this works! Data fetched may not be accurate/up to date and this is not financial advice."
+                       'About': "A stock dashboard with a focus on ESG ratings and NLP analysis of recent news. Data fetched may not be accurate/up to date and this is not financial advice. Powered by Yahoo! Finance and NewsAPI."
                    })
-title, loadingtext = st.columns([1, 1])
-with title:
-    st.title(":crystal_ball: Predticker")
 
-st.caption("A magic stock dashboard")
-# nltk.download('punkt')
+# Initialize session state keys
 if 'stocks' not in st.session_state:
-    st.session_state.stocks = set(["AAPL", "GOOG", "TSLA", "MSFT"])
+    st.session_state.stocks = set(["AAPL", "CAT", "TSLA", "MSFT"])
 if 'predictiontext' not in st.session_state:
     st.session_state.predictiontext = ''
 if 'currentlayoutbutton' not in st.session_state:
@@ -85,8 +66,15 @@ if 'newgraph' not in st.session_state:
 if 'currentdataframe' not in st.session_state:
     # make this set to what the selector is currently set to
     st.session_state.currentdataframe = None
+
 # User Input
-col1, col2, col3 = st.columns([6, 3, 3])
+col1, col2, col3 = st.columns([4, 3, 3])
+# with bird:
+#     st.title(':parrot:')
+with col1:
+    st.title(":parrot: ESGParrot")
+    st.caption("An ESG-focused stock dashboard")
+
 
 # Adds an inputted stock string to a list of stocks in the state
 # Checks for an invalid ticker by attempting to get the first value in a column
@@ -101,10 +89,10 @@ def addstock():
             st.session_state.stocks.add(st.session_state.textinput)
             st.session_state.selectbox = st.session_state.textinput
         except IndexError:
-            with col3:
-                st.error(
-                    f'Error: "{st.session_state.textinput}" is an invalid ticker.')
-                st.session_state.textinput = ''
+            st.toast(
+                body=f'Error: "{st.session_state.textinput}" is an invalid ticker.',
+                icon='🚩')
+            st.session_state.textinput = ''
 
 # Sets a streamlit state boolean to true, making the graph render a new stock's data set.
 
@@ -113,18 +101,21 @@ def newgraph():
     st.session_state.newgraph = True
 
 
-with col1:
+with col2:
+    st.text('')
     selected_stock = st.selectbox("Select a ticker from your list:",
                                   st.session_state.stocks,
                                   key='selectbox',
                                   on_change=newgraph)
-with col2:
+with col3:
+    st.text('')
     newstock = st.text_input(label='Add a ticker to the list...',
                              placeholder="Type a ticker to add",
                              max_chars=4,
                              on_change=addstock,
                              key='textinput',
                              help='Please input a valid US ticker.')
+
 
 # Load correctly formatted data in a pandas dataframe.
 
@@ -147,19 +138,8 @@ def add_indicators(df):
     df['MACDS'] = df.index.map(macds)
     # Bollinger Bands
     df.ta.bbands(length=20, append=True)
-    ta.bbands(
-        df['Adj Close'], timeperiod=20)
-    # This is a target based off of the next day's increase
-    # df['Target'] = df['Adj Close']-df.Open
-    # df['Target'] = df['Target'].shift(-1)
-
-    # df['TargetClass'] = [1 if df.Target[i]
-    #                      > 0 else 0 for i in range(len(df))]
-
-    # df['TargetNextClose'] = df['Adj Close'].shift(-1)
-    # Returns
+    ta.bbands(df['Adj Close'], timeperiod=20)
     # Log return is defined as ln(d2/d1)
-    print(help(ta.log_return))
     # Starts at day 1
     df.ta.log_return(close=df['Adj Close'], cumulative=True, append=True)
     # Day over day log return
@@ -169,27 +149,10 @@ def add_indicators(df):
     # Percent return (now/day1)
     df.ta.percent_return(close=df['Adj Close'], cumulative=True, append=True)
 
-    # Create features for the ML model
+    # Create signals
     df['EMA_12_EMA_26'] = np.where(df['EMA12'] > df['EMA26'], 1, -1)
     df['Close_EMA_12'] = np.where(df['Close'] > df['EMA12'], 1, -1)
     df['MACDS_MACD'] = np.where(df['MACDS'] > df['MACD'], 1, -1)
-
-    # TODO: PLR
-    # def bestSegments(close):
-
-    # TODO: compute a threshold for the stock
-
-    # TODO: make the PLR
-    # def plr(close):
-
-    # make a line between the start and end
-    # for each point in the close vs date series, calculate euclidean distance between L
-
-    # TODO: Trading signal (piece-wise linear regression)
-
-    # TODO: Naive Forecast, aka the previous day's price
-    # TODO: check if this is needed for preprocessing!
-    # df.dropna(inplace=True)
 
 
 @st.cache_data(show_spinner=False)
@@ -212,200 +175,6 @@ dt_obs = [d.strftime("%Y-%m-%d") for d in data['Date']]
 # isolate missing timestamps
 dt_breaks = [d for d in dt_all.strftime(
     "%Y-%m-%d").tolist() if not d in dt_obs]
-
-
-def predict(stockdataframe):
-
-    # Put the data set in the correct form for training
-    @st.cache_data
-    def Prepare_Data(dataframe, days):
-
-        df = dataframe.copy()
-        # the last n rows in future will be NAN, where n = days
-        df['future'] = df['scaled_close'].shift(-days)
-        # gets the NAN rows from the future column
-        # This is the prediction set
-        last_sequence = np.array(df[['scaled_close']].tail(days))
-        # then drops the rows from the whole df
-        df.dropna(inplace=True)
-
-        sequence_data = []
-        sequences = deque(maxlen=lookback)
-
-        for entry, target in zip(df[['scaled_close', 'Date']].values, df['future'].values):
-            sequences.append(entry)
-            if len(sequences) == lookback:
-                sequence_data.append([np.array(sequences), target])
-
-        last_sequence = list([s[:1] for s in sequences]) + list(last_sequence)
-        last_sequence = np.array(last_sequence).astype(np.float32)
-        print(last_sequence)
-        # build X and Y training set
-        X, Y = [], []
-        for seq, target in sequence_data:
-            X.append(seq)
-            Y.append(target)
-
-        # convert X and Y to numpy arrays for compatibility, then do
-        # 80 10 10 split train test val
-        X = np.array(X)
-        Y = np.array(Y)
-
-        X_train, X_test, y_train, y_test = train_test_split(X, Y, train_size=0.8,
-                                                            shuffle=False)
-
-        X_train = X_train[:, :, :1].astype(np.float32)
-        X_test = X_test[:, :, :1].astype(np.float32)
-
-        return last_sequence, X_train, y_train, X_test, y_test
-
-    def Create_Model(lookback, batchsize, units, dropout, optimizer, loss,):
-        # A linear stack of layers
-        model = Sequential()
-
-        model.add(LSTM(units, return_sequences=True,
-                  input_shape=(lookback, 1)))
-        model.add(Dropout(dropout))
-        model.add(LSTM(units, return_sequences=False))
-        model.add(Dropout(dropout))
-        # model.add(LSTM(units=50, input_shape=(None, 120)))
-        # model.add(Dropout(0.2))
-        # Output layer
-        model.add(Dense(1))
-        opt = keras.optimizers.Adam(learning_rate=0.01)
-        model.compile(loss='mse', optimizer=opt, metrics=[metrics.mean_squared_error,
-                                                          metrics.mean_absolute_error,
-                                                          tf.keras.metrics.Recall(),
-                                                          ])
-        return model
-
-    def Create_Model_Tuning(hp):
-        # Define a hyperparameter space
-        # batch_size = hp.Int('batch_size', min_value=16,
-        #                     max_value=64, step=16)
-        # epochs = hp.Int('epochs', min_value=4, max_value=8, step=2)
-        # units = hp.Int('units', min_value=60, max_value=120, step=30)
-        units = 60
-        model = Sequential()
-        lookback = 45
-        # this could be where the crash happens
-        model.add(LSTM(units, return_sequences=True,
-                  input_shape=(lookback, 1)))
-        model.add(Dropout(rate=0.25))
-        model.add(LSTM(units, return_sequences=False))
-        model.add(Dropout(rate=0.25))
-        # Makes sure that for each day, there is only one prediction
-        model.add(Dense(1))
-        # hp_learning_rate = hp.Choice('learning rate', [.001, .0001])
-        optimizer = 'adam'
-        model.compile(loss='mse', optimizer=optimizer,
-                      metrics=[metrics.mean_squared_error,
-                               metrics.mean_absolute_error,
-                               tf.keras.metrics.Recall(),
-                               ])
-        return model
-
-    def Train_Model(_model, x_train, y_train, x_val, y_val, batchsize, epochs):
-
-        history = model.fit(x_train, y_train, epochs=epochs,
-                            batch_size=batchsize, verbose=1, validation_data=(x_val, y_val))
-        print(history.history.keys())
-        return model, history.history
-
-    def crossValidation(x_train, y_train, x_val, y_val):
-        tuner = keras_tuner.GridSearch(
-            hypermodel=Create_Model_Tuning, objective='val_loss',
-            overwrite=True,
-            directory="hyperparams",
-            project_name="tune_hypermodel")
-        tuner.search(x_train, y_train, epochs=3,
-                     validation_data=(x_val, y_val))
-        best_params = tuner.get_best_hyperparameters(3)
-
-        return best_params[0]
-
-    # TODO: make hyperparameter tuning stuff.
-    # Hand-Picked hyperparameters if tuning is not selected
-    # take the dataframe, chop it the amount back specified internally
-    lookback = 45  # Number of days back that the model can look back on when making sets to train, validate, and test
-    # Number of days that the model will predict. To predict the next three days, modify it as follows: [1,2,3]
-    predictionsteps = list(range(1, dayslider+1))
-    batchsize = 16  # Number of training samples that will be passed to the network in one epoch
-    # Probability to exclude the input and recurrent connections to improve performance by regularization (25%)
-    dropout = 0.25
-    units = 120  # Number of neurons connected to the layer
-    epochs = 3  # Number of times that the learning algorithm will work through the entire training set
-    loss = 'mean_squared_error'  # Methodology to measure the inaccuracy
-    optimizer = 'adam'  # Optimizer used to iterate to better states
-
-    scaler = MinMaxScaler()
-    # Fit the scaler so it understands what is going on
-    # TODO: Scale test and train individually!
-    stockdataframe['scaled_close'] = scaler.fit_transform(
-        np.expand_dims(stockdataframe['Close'].values, axis=1))
-
-    predictions = []
-
-    for step in predictionsteps:
-        # prediction data, training data, validation data
-
-        last_sequence, x_train, y_train, x_test, y_test = Prepare_Data(
-            stockdataframe, step)
-
-        if st.session_state.hptuning:
-            best_params = crossValidation(
-                x_train, y_train, x_test, y_test)
-            model = Create_Model_Tuning(best_params)
-        else:
-            model = Create_Model(lookback, batchsize, units,
-                                 dropout, optimizer, loss,)
-
-        model, modelhistory = Train_Model(model, x_train, y_train,
-                                          x_test, y_test, batchsize, epochs)
-
-        st.session_state.modelhistory = modelhistory
-
-        stats = model.evaluate(
-            x_test, y_test, verbose=1)
-        st.session_state.metrics = stats
-
-        # takes out the last day so shape matches lookback
-        last_sequence = last_sequence[-lookback:]
-        last_sequence = np.expand_dims(last_sequence, axis=0)
-        # Returns the scaled prediction as a numpy array
-        prediction = model.predict(x=last_sequence)
-        # Converts the scaled prediction to actual $! Yay!
-        predicted_price = scaler.inverse_transform(prediction)[0][0]
-
-        predictions.append(round(float(predicted_price), 2))
-
-    # Print Prediction
-    if len(predictions) > 0:
-        predictions_list = [str(d) for d in predictions]
-        predictions_str = ', \$'.join(predictions_list)
-        st.session_state.predictionary[f'{selected_stock}'] = '\$' + \
-            predictions_str
-
-
-# PREDICTION UI
-col4, col5, col6 = st.columns([6, 3, 3])
-with col4:
-    dayslider = st.slider(label="Select how many days ahead you'd like to predict the closing price:",
-                          min_value=1,
-                          max_value=5)
-with col5:
-    st.write('')
-    st.write('')
-    adder = st.button(f'Predict **{dayslider}** day(s) ahead... :male_mage:')
-with col6:
-    st.write('')
-    # prediction = st.write(st.session_state.predictiontext)
-    if adder:
-        doneindicator = st.write('')
-        st.write('')
-        with st.spinner('Predicting...'):
-            predict(st.session_state.currentdataframe)
-
 
 # Define the plot types and the default layouts
 
@@ -471,7 +240,7 @@ with subinfo:
         message = f"{selected_stock}'s closing price prediction(s): :magic_wand: {st.session_state.predictionary[selected_stock]}"
         prediction = st.subheader(message)
 
-# TODO: This method is fundamentally flawed. Fix it.
+# TODO: This method returns slightly incorrect ranges for YTD
 
 
 @st.cache_data
@@ -602,40 +371,37 @@ if rangebutton == '1W':
     st.plotly_chart(fig, use_container_width=True)
     if st.session_state.volumecheck:
         st.plotly_chart(fig2, use_container_width=True)
-if rangebutton == '1M':
+elif rangebutton == '1M':
     scalePlots(st.session_state.currentdataframe, '1M', fig, fig2)
     st.plotly_chart(fig, use_container_width=True)
     if st.session_state.volumecheck:
         st.plotly_chart(fig2, use_container_width=True)
-if rangebutton == '6M':
+elif rangebutton == '6M':
     scalePlots(st.session_state.currentdataframe, '6M', fig, fig2)
     st.plotly_chart(fig, use_container_width=True)
     if st.session_state.volumecheck:
         st.plotly_chart(fig2, use_container_width=True)
-if rangebutton == 'YTD':
+elif rangebutton == 'YTD':
     scalePlots(st.session_state.currentdataframe, 'YTD', fig, fig2)
     st.plotly_chart(fig, use_container_width=True)
     if st.session_state.volumecheck:
         st.plotly_chart(fig2, use_container_width=True)
-if rangebutton == '1Y':
+elif rangebutton == '1Y':
     scalePlots(st.session_state.currentdataframe, '1Y', fig, fig2)
     st.plotly_chart(fig, use_container_width=True)
     if st.session_state.volumecheck:
         st.plotly_chart(fig2, use_container_width=True)
-if rangebutton == '5Y':
+elif rangebutton == '5Y':
     scalePlots(st.session_state.currentdataframe, '5Y', fig, fig2)
     st.plotly_chart(fig, use_container_width=True)
     if st.session_state.volumecheck:
         st.plotly_chart(fig2, use_container_width=True)
-if rangebutton == 'Max':
+elif rangebutton == 'Max':
     scalePlots(st.session_state.currentdataframe, 'Max', fig, fig2)
     st.plotly_chart(fig, use_container_width=True)
     if st.session_state.volumecheck:
         st.plotly_chart(fig2, use_container_width=True)
 
-# Recent News Section!
-# summarizer = pipeline("summarization")
-newsheader, newsbutton = st.columns([1, 3])
 
 # Label a company
 
@@ -725,21 +491,17 @@ def labelCompany(text):
 def fetchInfo(ticker):
     ticker = yf.Ticker(ticker)
     info = ticker.get_info()
-    # Currently throws a 401
-    # esgscores = yesg.get_esg_short(f'{selected_stock}').to_string()
     return info
 
 
 info = fetchInfo(selected_stock)
-# st.caption(esgscores)
-# st.caption(f'{info["sustainability"]}')
 if info:
     if 'longName' in info:
         name = info['longName']
 else:
     name = selected_stock
-if 'longBusinessSummary' in info:
-    with st.expander(f"{name}'s summary"):
+with st.expander(f"{name}'s summary"):
+    if 'longBusinessSummary' in info:
         label = labelCompany(info['longBusinessSummary'])
         data_df = pd.DataFrame(
             {
@@ -758,25 +520,86 @@ if 'longBusinessSummary' in info:
             },
             hide_index=True,)
         st.caption(info['longBusinessSummary'])
+    else:
+        st.error(f"{name}'s summary not available")
+
+
+@st.cache_data(show_spinner=False)
+def fetchESG(ticker):
+    url = f"https://yahoo-finance127.p.rapidapi.com/esg-score/{ticker}"
+
+    headers = {
+        "RapidAPI-Key": st.secrets["yahoofinancekey"],
+        "RapidAPI-Host": "yahoo-finance127.p.rapidapi.com"
+    }
+
+    response = requests.get(url, headers=headers)
+
+    return response.json()
+
+
+st.subheader(f"{name}'s ESG statistics")
+json = fetchESG(selected_stock)
+if 'message' not in json:
+    delta = 0
+    url = "https://www.sustainalytics.com/corporate-solutions/esg-solutions/esg-risk-ratings"
+    o, e, s, g = st.columns([2, 1, 1, 1])
+    with o:
+        # st.text('')
+        value = json['totalEsg']['fmt']
+        st.metric(label='Overall ESG Risk', value=value, delta=None,
+                  help='Overall risk is calculated by adding each individual risk score.')
+        tier = float(value)
+        tierstring = 'bug!'
+        if tier > 0 and tier < 10:
+            tierstring = 'Negligible'
+        elif tier >= 10 and tier < 20:
+            tierstring = 'Low'
+        elif tier >= 20 and tier < 30:
+            tierstring = 'Medium'
+        elif tier >= 30 and tier < 40:
+            tierstring = 'High'
+        elif tier > 40:
+            tierstring = 'Severe'
+        st.caption(tierstring)
+    with e:
+        st.metric(label='Environment Risk',
+                  value=json['environmentScore']['fmt'], delta=None)
+    with s:
+        st.metric(label='Social Risk',
+                  value=json['socialScore']['fmt'], delta=None)
+    with g:
+        st.metric(label='Governance Risk',
+                  value=json['governanceScore']['fmt'], delta=None)
+    info, graphic = st.columns([2, 3])
+    with info:
+        st.caption(
+            f'{json["percentile"]["fmt"]}th percentile in the {json["peerGroup"]} peer group as of {json["ratingMonth"]}/{json["ratingYear"]}')
+    with graphic:
+        st.image('https://www.sustainalytics.com/images/default-source/default-album/ratings.png?sfvrsn=74f12bcf_9', output_format='PNG')
+    st.caption('[How does this work?](%s)' % url)
 else:
-    st.error(f"{name}'s summary not available")
+    st.error(f'Sustainability data is currently not available for {name}')
 st.divider()
+
+# News Section:
 st.subheader('Recent News:')
+# TODO: make error message display properly. AKA, add an 'error' message to the dictionary entry for that company if it fails.
 
 
 @st.cache_data(show_spinner=False)
 def fetchNews(name):
     try:
         # TODO: query results in good articles, but further tuning may be needed
-        # Init
+
         query_params = {
             'q': f'{name}',
             "sortBy": "relevancy",
-            "apiKey": "100a9812d1544d1bb65ae12e83c14ce5",
+            "apiKey": st.secrets["newsapikey"],
+
             "page": 1,
-            "sources": "cnn,reuters,cbs-news,usa-today,the-washington-post,the-wall-street-journal,associated-press,financial-times,newsweek",
-            "domains": 'gizmodo.com,forbes.com/business/,bloomberg.com,businessinsider.com',
-            # "excludeDomains":
+            # "sources": "reuters,cbs-news,the-washington-post,the-wall-street-journal,financial-times",
+            # "domains": 'cnbc.com/business,usatoday.com/money/,cnn.com/business,gizmodo.com/tech,apnews.com/business,forbes.com/business/,bloomberg.com,newsweek.com/business,finance.yahoo.com/news/,',
             "pageSize": 3,
             "language": "en"
         }
@@ -798,39 +621,39 @@ if f'{selected_stock}' not in st.session_state.newsdictionary:
     st.session_state.newsdictionary[f'{selected_stock}'] = fetchNews(name)
 
 # create dropdowns for each article
-for ar in st.session_state.newsdictionary[f'{selected_stock}']:
-    try:
-        with st.expander(ar['title']):
-            url = ar["url"]
-            # fullarticle = Article(url)
-            # fullarticle.download()
-            # fullarticle.parse()
-            # fullarticle.nlp()
-            # data_df = fullarticle.keywords
-            # print(type(data_df)) # list
-            stripped = ar['publishedAt'].split("T", 1)[0]
-            st.caption(f"{ar['description']}")
-            # st.caption(f"{fullarticle.text}")
-            sentbutton = st.button(label='Generate an analysis...',
-                                   key=url)
-            if sentbutton:
-                sentiment_pipeline = pipeline("sentiment-analysis")
-                # TODO: improve pipeline, and get full article contents
-                sent = sentiment_pipeline(ar['title'])
-                st.text(sent[0]['label'])
-            st.caption(f'[Read at {ar["source"]["name"]}](%s)' % url)
-            if ar["author"]:
-                st.caption(f'Written by {ar["author"]}')
-            st.caption(f'{stripped}')
-    except:
-        st.error("Failed to grab article.")
+if st.session_state.newsdictionary[f'{selected_stock}']:
+    for ar in st.session_state.newsdictionary[f'{selected_stock}']:
+        try:
+            with st.expander(ar['title']):
+                url = ar["url"]
+                # fullarticle = Article(url)
+                # fullarticle.download()
+                # fullarticle.parse()
+                # fullarticle.nlp()
+                # data_df = fullarticle.keywords
+                # print(type(data_df)) # list
+                stripped = ar['publishedAt'].split("T", 1)[0]
+                st.caption(f"{ar['description']}")
+                # st.caption(f"{fullarticle.text}")
+                sentbutton = st.button(label='Generate an analysis...',
+                                       key=url)
+                if sentbutton:
+                    sentiment_pipeline = pipeline("sentiment-analysis")
+                    # TODO: improve pipeline, and get full article contents
+                    sent = sentiment_pipeline(ar['title'])
+                    st.text(sent[0]['label'])
+                st.caption(f'[Read at {ar["source"]["name"]}](%s)' % url)
+                if ar["author"]:
+                    st.caption(f'Written by {ar["author"]}')
+                st.caption(f'{stripped}')
+        except:
+            st.error("Failed to grab article.")
+else:
+    st.error('No articles found.')
 
 # Extras + Debug Menu
 st.divider()
 st.subheader('Extras:')
-# hptuning = st.checkbox(
-#     label='Perform cross-validation before prediction (2-3x delay, could improve predictions)',
-#     key='hptuning')
 with st.expander(f"{selected_stock}'s Dataframe"):
     st.dataframe(data=st.session_state.currentdataframe,
                  use_container_width=True)
