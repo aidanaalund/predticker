@@ -3,6 +3,13 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+
+# Secrets
+secrets.toml
+
+# Test files
+plrdebug.py
+
 # C extensions
 *.so
 
