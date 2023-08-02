@@ -1,5 +1,5 @@
-# Predticker🔮   [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://predticker.streamlit.app/)
-A web application that identifies stock patterns of publicly traded companies and speculates future values.
+# 🦜ESGParrot   [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://esgparrot.streamlit.app/)
+A dashboard to help evaluate a company's ESG performance, using NLP analysis.
 
 Check out our [prototype version](https://predticker.streamlit.app/) on Streamlit Cloud 
 _or_ download webapp.py and use the command _streamlit run webapp.py_ in a Python environment of your choice with all dependencies installed.

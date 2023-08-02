@@ -596,6 +596,7 @@ def fetchNews(name):
             'q': f'{name}',
             "sortBy": "relevancy",
             "apiKey": st.secrets["newsapikey"],
+
             "page": 1,
             # "sources": "reuters,cbs-news,the-washington-post,the-wall-street-journal,financial-times",
             # "domains": 'cnbc.com/business,usatoday.com/money/,cnn.com/business,gizmodo.com/tech,apnews.com/business,forbes.com/business/,bloomberg.com,newsweek.com/business,finance.yahoo.com/news/,',
