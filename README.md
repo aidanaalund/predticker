@@ -1,4 +1,4 @@
-# Predticker🔮   [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://predticker.streamlit.app/)
+# ESGParrot🦜   [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://esgparrot.streamlit.app/)
 A dashboard to help evaluate a company's ESG performance, using NLP analysis.
 
 Check out our [prototype version](https://predticker.streamlit.app/) on Streamlit Cloud 
