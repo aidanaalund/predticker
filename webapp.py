@@ -14,6 +14,11 @@ from collections import deque
 from datetime import datetime
 import datetime
 
+# PDF imports
+import pdfplumber
+from PyPDF2 import PdfReader
+import io
+
 # News/NLP imports
 from transformers import pipeline
 import json
@@ -22,6 +27,7 @@ import newsapi
 import nltk
 import re
 from heapq import nlargest
+from bs4 import BeautifulSoup
 
 START = "2016-01-01"
 TODAY = date.today().strftime("%Y-%m-%d")
@@ -43,16 +49,10 @@ if 'predictiontext' not in st.session_state:
     st.session_state.predictiontext = ''
 if 'currentlayoutbutton' not in st.session_state:
     st.session_state.currentlayoutbutton = None
-if 'predictionary' not in st.session_state:
-    st.session_state.predictionary = {}
 if 'newsdictionary' not in st.session_state:
     st.session_state.newsdictionary = {}
-if 'metrics' not in st.session_state:
-    st.session_state.metrics = ''
-if 'hptuning' not in st.session_state:
-    st.session_state.hptuning = False
-if 'costfunctioncheck' not in st.session_state:
-    st.session_state.costfunctioncheck = False
+if 'esgdictionary' not in st.session_state:
+    st.session_state.esgdictionary = {}
 if 'bbandcheck' not in st.session_state:
     st.session_state.bbandcheck = False
 if 'volumecheck' not in st.session_state:
@@ -66,6 +66,10 @@ if 'newgraph' not in st.session_state:
 if 'currentdataframe' not in st.session_state:
     # make this set to what the selector is currently set to
     st.session_state.currentdataframe = None
+if 'fileuploader' not in st.session_state:
+    st.session_state.fileuploader = None
+if 'pdftext' not in st.session_state:
+    st.session_state.pdftext = None
 
 # User Input
 col1, col2, col3 = st.columns([4, 3, 3])
@@ -154,6 +158,8 @@ def add_indicators(df):
     df['Close_EMA_12'] = np.where(df['Close'] > df['EMA12'], 1, -1)
     df['MACDS_MACD'] = np.where(df['MACDS'] > df['MACD'], 1, -1)
 
+# Consider refactoring to use RapidAPI
+
 
 @st.cache_data(show_spinner=False)
 def load_data(ticker):
@@ -235,10 +241,6 @@ with header:
         }
         </style>
         """, unsafe_allow_html=True)
-with subinfo:
-    if selected_stock in st.session_state.predictionary:
-        message = f"{selected_stock}'s closing price prediction(s): :magic_wand: {st.session_state.predictionary[selected_stock]}"
-        prediction = st.subheader(message)
 
 # TODO: This method returns slightly incorrect ranges for YTD
 
@@ -403,94 +405,96 @@ elif rangebutton == 'Max':
         st.plotly_chart(fig2, use_container_width=True)
 
 
-# Label a company
+# # Label a company
 
-# insurance_keywords = ['actuary', 'claims', 'coverage', 'deductible', 'policyholder', 'premium', 'underwriter', 'risk assessment', 'insurable interest', 'loss ratio', 'reinsurance', 'actuarial tables', 'property damage', 'liability', 'flood insurance', 'term life insurance', 'whole life insurance', 'health insurance', 'auto insurance', 'homeowners insurance', 'marine insurance', 'crop insurance', 'catastrophe insurance', 'umbrella insurance',
-#                       'pet insurance', 'travel insurance', 'professional liability insurance', 'disability insurance', 'long-term care insurance', 'annuity', 'pension plan', 'group insurance', 'insurtech', 'insured', 'insurer', 'subrogation', 'adjuster', 'third-party administrator', 'excess and surplus lines', 'captives', 'workers compensation', 'insurance fraud', 'health savings account', 'health maintenance organization', 'preferred provider organization']
+# # insurance_keywords = ['actuary', 'claims', 'coverage', 'deductible', 'policyholder', 'premium', 'underwriter', 'risk assessment', 'insurable interest', 'loss ratio', 'reinsurance', 'actuarial tables', 'property damage', 'liability', 'flood insurance', 'term life insurance', 'whole life insurance', 'health insurance', 'auto insurance', 'homeowners insurance', 'marine insurance', 'crop insurance', 'catastrophe insurance', 'umbrella insurance',
+# #                       'pet insurance', 'travel insurance', 'professional liability insurance', 'disability insurance', 'long-term care insurance', 'annuity', 'pension plan', 'group insurance', 'insurtech', 'insured', 'insurer', 'subrogation', 'adjuster', 'third-party administrator', 'excess and surplus lines', 'captives', 'workers compensation', 'insurance fraud', 'health savings account', 'health maintenance organization', 'preferred provider organization']
 
-finance_keywords = ['asset', 'liability', 'equity', 'capital', 'portfolio', 'dividend', 'financial statement', 'balance sheet', 'income statement', 'cash flow statement', 'statement of retained earnings', 'financial ratio', 'valuation', 'bond', 'stock', 'mutual fund', 'exchange-traded fund', 'hedge fund', 'private equity', 'venture capital', 'mergers and acquisitions', 'initial public offering', 'secondary market',
-                    'primary market', 'securities', 'derivative', 'option', 'futures', 'forward contract', 'swaps', 'commodities', 'credit rating', 'credit score', 'credit report', 'credit bureau', 'credit history', 'credit limit', 'credit utilization', 'credit counseling', 'credit card', 'debit card', 'ATM', 'bankruptcy', 'foreclosure', 'debt consolidation', 'taxes', 'tax return', 'tax deduction', 'tax credit', 'tax bracket', 'taxable income']
+# finance_keywords = ['asset', 'liability', 'equity', 'capital', 'portfolio', 'dividend', 'financial statement', 'balance sheet', 'income statement', 'cash flow statement', 'statement of retained earnings', 'financial ratio', 'valuation', 'bond', 'stock', 'mutual fund', 'exchange-traded fund', 'hedge fund', 'private equity', 'venture capital', 'mergers and acquisitions', 'initial public offering', 'secondary market',
+#                     'primary market', 'securities', 'derivative', 'option', 'futures', 'forward contract', 'swaps', 'commodities', 'credit rating', 'credit score', 'credit report', 'credit bureau', 'credit history', 'credit limit', 'credit utilization', 'credit counseling', 'credit card', 'debit card', 'ATM', 'bankruptcy', 'foreclosure', 'debt consolidation', 'taxes', 'tax return', 'tax deduction', 'tax credit', 'tax bracket', 'taxable income']
 
-# banking_capital_markets_keywords = ['bank', 'credit union', 'savings and loan association', 'commercial bank', 'investment bank', 'retail bank', 'wholesale bank', 'online bank', 'mobile banking', 'checking account', 'savings account', 'money market account', 'certificate of deposit', 'loan', 'mortgage', 'home equity loan', 'line of credit', 'credit card', 'debit card', 'ATM', 'automated clearing house', 'wire transfer', 'ACH',
-#                                     'SWIFT', 'international banking', 'foreign exchange', 'forex', 'currency exchange', 'central bank', 'Federal Reserve', 'interest rate', 'inflation', 'deflation', 'monetary policy', 'fiscal policy', 'quantitative easing', 'securities', 'stock', 'bond', 'mutual fund', 'exchange-traded fund', 'hedge fund', 'private equity', 'venture capital', 'investment management', 'portfolio management', 'wealth management', 'financial planning']
+# # banking_capital_markets_keywords = ['bank', 'credit union', 'savings and loan association', 'commercial bank', 'investment bank', 'retail bank', 'wholesale bank', 'online bank', 'mobile banking', 'checking account', 'savings account', 'money market account', 'certificate of deposit', 'loan', 'mortgage', 'home equity loan', 'line of credit', 'credit card', 'debit card', 'ATM', 'automated clearing house', 'wire transfer', 'ACH',
+# #                                     'SWIFT', 'international banking', 'foreign exchange', 'forex', 'currency exchange', 'central bank', 'Federal Reserve', 'interest rate', 'inflation', 'deflation', 'monetary policy', 'fiscal policy', 'quantitative easing', 'securities', 'stock', 'bond', 'mutual fund', 'exchange-traded fund', 'hedge fund', 'private equity', 'venture capital', 'investment management', 'portfolio management', 'wealth management', 'financial planning']
 
-healthcare_life_sciences_keywords = ['medical', 'pharmaceutical', 'pharmaceuticals', 'biotechnology', 'clinical trial', 'FDA', 'healthcare provider', 'healthcare plan', 'healthcare insurance', 'patient', 'doctor', 'nurse', 'pharmacist', 'hospital', 'clinic',
-                                     'healthcare system', 'healthcare policy', 'public health', 'healthcare IT', 'electronic health record', 'telemedicine', 'personalized medicine', 'genomics', 'proteomics', 'clinical research', 'drug development', 'drug discovery', 'medicine', 'health']
+# healthcare_life_sciences_keywords = ['medical', 'pharmaceutical', 'pharmaceuticals', 'biotechnology', 'clinical trial', 'FDA', 'healthcare provider', 'healthcare plan', 'healthcare insurance', 'patient', 'doctor', 'nurse', 'pharmacist', 'hospital', 'clinic',
+#                                      'healthcare system', 'healthcare policy', 'public health', 'healthcare IT', 'electronic health record', 'telemedicine', 'personalized medicine', 'genomics', 'proteomics', 'clinical research', 'drug development', 'drug discovery', 'medicine', 'health']
 
-law_keywords = ['law', 'legal', 'attorney', 'lawyer', 'litigation', 'arbitration', 'dispute resolution', 'contract law', 'intellectual property',
-                'corporate law', 'labor law', 'tax law', 'real estate law', 'environmental law', 'criminal law', 'family law', 'immigration law', 'bankruptcy law']
+# law_keywords = ['law', 'legal', 'attorney', 'lawyer', 'litigation', 'arbitration', 'dispute resolution', 'contract law', 'intellectual property',
+#                 'corporate law', 'labor law', 'tax law', 'real estate law', 'environmental law', 'criminal law', 'family law', 'immigration law', 'bankruptcy law']
 
-# sports_keywords = ['sports', 'football', 'basketball', 'baseball', 'hockey', 'soccer', 'golf', 'tennis', 'olympics', 'athletics',
-#                    'coaching', 'sports management', 'sports medicine', 'sports psychology', 'sports broadcasting', 'sports journalism', 'esports', 'fitness']
+# # sports_keywords = ['sports', 'football', 'basketball', 'baseball', 'hockey', 'soccer', 'golf', 'tennis', 'olympics', 'athletics',
+# #                    'coaching', 'sports management', 'sports medicine', 'sports psychology', 'sports broadcasting', 'sports journalism', 'esports', 'fitness']
 
-media_keywords = ['media', 'entertainment', 'film', 'television', 'radio', 'music', 'news', 'journalism', 'publishing', 'public relations',
-                  'advertising', 'marketing', 'social media', 'digital media', 'animation', 'graphic design', 'web design', 'video production']
+# media_keywords = ['media', 'entertainment', 'film', 'television', 'radio', 'music', 'news', 'journalism', 'publishing', 'public relations',
+#                   'advertising', 'marketing', 'social media', 'digital media', 'animation', 'graphic design', 'web design', 'video production']
 
-manufacturing_keywords = ['manufacturing', 'production', 'assembly', 'logistics', 'supply chain', 'quality control', 'lean manufacturing', 'six sigma', 'industrial engineering',
-                          'process improvement', 'machinery', 'automation', 'aerospace', 'automotive', 'chemicals', 'construction materials', 'consumer goods', 'electronics', 'semiconductors']
+# manufacturing_keywords = ['manufacturing', 'production', 'assembly', 'logistics', 'supply chain', 'quality control', 'lean manufacturing', 'six sigma', 'industrial engineering',
+#                           'process improvement', 'machinery', 'automation', 'aerospace', 'automotive', 'chemicals', 'construction materials', 'consumer goods', 'electronics', 'semiconductors']
 
-automotive_keywords = ['automotive', 'cars', 'trucks', 'SUVs', 'electric vehicles', 'hybrid vehicles', 'autonomous vehicles', 'car manufacturing',
-                       'automotive design', 'car dealerships', 'auto parts', 'vehicle maintenance', 'car rental', 'fleet management', 'telematics']
+# automotive_keywords = ['automotive', 'cars', 'trucks', 'SUVs', 'electric vehicles', 'hybrid vehicles', 'autonomous vehicles', 'car manufacturing',
+#                        'automotive design', 'car dealerships', 'auto parts', 'vehicle maintenance', 'car rental', 'fleet management', 'telematics']
 
-telecom_keywords = ['telecom', 'telecommunications', 'wireless', 'networks', 'internet', 'broadband', 'fiber optics', '5G', 'telecom infrastructure',
-                    'telecom equipment', 'VoIP', 'satellite communications', 'mobile devices', 'smartphones', 'telecom services', 'telecom regulation', 'telecom policy']
-# other categories to add: agriculture, energy, construction
+# telecom_keywords = ['telecom', 'telecommunications', 'wireless', 'networks', 'internet', 'broadband', 'fiber optics', '5G', 'telecom infrastructure',
+#                     'telecom equipment', 'VoIP', 'satellite communications', 'mobile devices', 'smartphones', 'telecom services', 'telecom regulation', 'telecom policy']
+# # other categories to add: agriculture, energy, construction
 
-agriculture_keywords = ['tractors', 'agriculture',
-                        'harvesters', 'machinery', 'nutrient', 'turf', 'forestry']
+# agriculture_keywords = ['tractors', 'agriculture',
+#                         'harvesters', 'machinery', 'nutrient', 'turf', 'forestry']
 
-information_technology_keywords = [
-    "Artificial intelligence", "Machine learning", "Data Science", "Big Data", "Cloud Computing",
-    "Cybersecurity", "Information security", "Network security", "Blockchain", "Cryptocurrency",
-    "Internet of things", "IoT", "Web development", "Mobile development", "Frontend development",
-    "Backend development", "Software engineering", "Software development", "Programming",
-    "Database", "Data analytics", "Business intelligence", "DevOps", "Agile", "Scrum",
-    "Product management", "Project management", "IT consulting", "IT service management",
-    "ERP", "CRM", "SaaS", "PaaS", "IaaS", "Virtualization", "Artificial reality", "AR", "Virtual reality",
-    "VR", "Gaming", "E-commerce", "Digital marketing", "SEO", "SEM", "Content marketing",
-    "Social media marketing", "User experience", "UX design", "UI design", "Cloud-native",
-    "Microservices", "Serverless", "Containerization", "Wearables", "Smartphone", "Cloud", "Electric Vehicles"
-]
+# information_technology_keywords = [
+#     "Artificial intelligence", "Machine learning", "Data Science", "Big Data", "Cloud Computing",
+#     "Cybersecurity", "Information security", "Network security", "Blockchain", "Cryptocurrency",
+#     "Internet of things", "IoT", "Web development", "Mobile development", "Frontend development",
+#     "Backend development", "Software engineering", "Software development", "Programming",
+#     "Database", "Data analytics", "Business intelligence", "DevOps", "Agile", "Scrum",
+#     "Product management", "Project management", "IT consulting", "IT service management",
+#     "ERP", "CRM", "SaaS", "PaaS", "IaaS", "Virtualization", "Artificial reality", "AR", "Virtual reality",
+#     "VR", "Gaming", "E-commerce", "Digital marketing", "SEO", "SEM", "Content marketing",
+#     "Social media marketing", "User experience", "UX design", "UI design", "Cloud-native",
+#     "Microservices", "Serverless", "Containerization", "Wearables", "Smartphone", "Cloud", "Electric Vehicles"
+# ]
 
-industries = {
-    # 'Insurance': insurance_keywords,
-    'Finance': finance_keywords,
-    # 'Banking': banking_capital_markets_keywords,
-    'Healthcare': healthcare_life_sciences_keywords,
-    'Legal': law_keywords,
-    'Agriculture': agriculture_keywords,
-    # 'Sports': sports_keywords,
-    'Media': media_keywords,
-    'Manufacturing': manufacturing_keywords,
-    'Automotive': automotive_keywords,
-    'Telecom': telecom_keywords,
-    'Technology': information_technology_keywords
-}
+# industries = {
+#     # 'Insurance': insurance_keywords,
+#     'Finance': finance_keywords,
+#     # 'Banking': banking_capital_markets_keywords,
+#     'Healthcare': healthcare_life_sciences_keywords,
+#     'Legal': law_keywords,
+#     'Agriculture': agriculture_keywords,
+#     # 'Sports': sports_keywords,
+#     'Media': media_keywords,
+#     'Manufacturing': manufacturing_keywords,
+#     'Automotive': automotive_keywords,
+#     'Telecom': telecom_keywords,
+#     'Technology': information_technology_keywords
+# }
 
 
-def labelCompany(text):
-    # Count the number of occurrences of each keyword in the text for each industry
-    counts = {}
-    for industry, keywords in industries.items():
-        count = sum([1 for keyword in keywords if re.search(
-            r"\b{}\b".format(keyword), text, re.IGNORECASE)])
-        counts[industry] = count
+# def labelCompany(text):
+#     # Count the number of occurrences of each keyword in the text for each industry
+#     counts = {}
+#     for industry, keywords in industries.items():
+#         count = sum([1 for keyword in keywords if re.search(
+#             r"\b{}\b".format(keyword), text, re.IGNORECASE)])
+#         counts[industry] = count
 
-    # Get the top industries based on their counts
-    top_industries = nlargest(2, counts, key=counts.get)
+#     # Get the top industries based on their counts
+#     top_industries = nlargest(2, counts, key=counts.get)
 
-    # # If only one industry was found, return it
-    # if len(top_industries) == 1:
-    #     return top_industries[0]
-    # # If two industries were found, return them both
-    # else:
-    return top_industries[0]
+#     # # If only one industry was found, return it
+#     # if len(top_industries) == 1:
+#     #     return top_industries[0]
+#     # # If two industries were found, return them both
+#     # else:
+#     return top_industries[0]
 
 
 @st.cache_data(show_spinner=False)
 def fetchInfo(ticker):
     ticker = yf.Ticker(ticker)
     info = ticker.get_info()
+    # for key, item in (info.items()):
+    #     print(key, "\t", item, "\n")
     return info
 
 
@@ -502,23 +506,23 @@ else:
     name = selected_stock
 with st.expander(f"{name}'s summary"):
     if 'longBusinessSummary' in info:
-        label = labelCompany(info['longBusinessSummary'])
-        data_df = pd.DataFrame(
-            {
-                "Tag": [
-                    label,
-                ],
-            }
-        )
-        st.data_editor(
-            data_df,
-            column_config={
-                "labels": st.column_config.ListColumn(
-                    "Tags",
-                    width="medium",
-                ),
-            },
-            hide_index=True,)
+        # label = labelCompany(info['longBusinessSummary'])
+        # data_df = pd.DataFrame(
+        #     {
+        #         "Tag": [
+        #             label,
+        #         ],
+        #     }
+        # )
+        # st.data_editor(
+        #     data_df,
+        #     column_config={
+        #         "labels": st.column_config.ListColumn(
+        #             "Tags",
+        #             width="medium",
+        #         ),
+        #     },
+        #     hide_index=True,)
         st.caption(info['longBusinessSummary'])
     else:
         st.error(f"{name}'s summary not available")
@@ -580,6 +584,97 @@ if 'message' not in json:
     st.caption('[How does this work?](%s)' % url)
 else:
     st.error(f'Sustainability data is currently not available for {name}')
+
+
+@st.cache_resource
+def esgBert():
+    return pipeline("text-classification", model="nbroad/ESG-BERT")
+
+
+def analysis():
+    pipe = esgBert()
+    st.session_state.esgdictionary[f'{selected_stock}'] = pipe(
+        st.session_state.report_input)
+
+
+st.text_area('Topic model a sustainability report/blurb:',
+             help='Using ESGBert, top ESG areas in the text are identified. Unexpected behavior will occur if text other than sustainability reports are inputted.',
+             placeholder='Put report text here...',
+             key='report_input',
+             on_change=analysis,
+             )
+if f'{selected_stock}' in st.session_state.esgdictionary:
+    st.caption('Strongest Topic:')
+    response = st.session_state.esgdictionary[f'{selected_stock}']
+    print(response)
+    st.caption(response[0]['label'].replace(
+        '_', ' ')+' ('+str(round(response[0]['score']*100, 3))+'%)')
+
+
+@st.cache_data(show_spinner=False)
+def find_csr_links(company_name):
+    # Construct the search query using the company name and keywords
+    search_query = f"{company_name}"
+
+    # Perform a web search using a search engine like Google
+    search_url = f"https://www.google.com/search?q={search_query}"
+    response = requests.get(search_url)
+
+    if response.status_code == 200:
+        # Parse the HTML content of the search results page
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        # Find all the search result links
+        search_results = soup.find_all('a')
+
+        # Iterate through the search results to find relevant links
+        csr_links = []
+        for link in search_results:
+            href = link.get('href')
+            if href and ("sustainability" in href or 'impact' in href) and 'report' in href:
+                sep = '&'
+                stripped = href.split(sep, 1)[0]
+                csr_links.append(stripped)
+        if csr_links:
+            return csr_links[0]
+        else:
+            return None
+    else:
+        print("Failed to fetch search results.")
+
+
+company_name = f"{name} CSR Report"
+csr_links = find_csr_links(company_name)
+if csr_links:
+    st.subheader('Found Impact Reporting:')
+    st.caption(csr_links[7:])
+
+# uploader, button = st.columns([3, 1])
+
+
+# with uploader:
+#     file = st.file_uploader(label='Analyze an impact report:',
+#                             type=['pdf'], help='PDF only.')
+
+
+# @st.cache_data
+# def parse():
+#     if file:
+#         path = file.read()
+#         with io.BytesIO(path) as open_pdf_file:
+#             reader = PdfReader(open_pdf_file)
+#             num_pages = len(reader.pages)
+#             st.session_state.pdftext = num_pages
+
+
+# with button:
+#     st.text('')
+#     st.text('')
+#     st.button('Parse file (may take a while!)', on_click=parse)
+
+# if st.session_state.pdftext:
+#     st.caption(st.session_state.pdftext)
+
 st.divider()
 
 # News Section:
@@ -587,7 +682,7 @@ st.subheader('Recent News:')
 # TODO: make error message display properly. AKA, add an 'error' message to the dictionary entry for that company if it fails.
 
 
-@st.cache_data(show_spinner=False)
+# @st.cache_data(show_spinner=False)
 def fetchNews(name):
     try:
         # TODO: query results in good articles, but further tuning may be needed
@@ -596,8 +691,8 @@ def fetchNews(name):
             'q': f'{name}',
             "sortBy": "relevancy",
             "apiKey": st.secrets["newsapikey"],
-
             "page": 1,
+            "excludeDomains": "readwrite.com",
             # "sources": "reuters,cbs-news,the-washington-post,the-wall-street-journal,financial-times",
             # "domains": 'cnbc.com/business,usatoday.com/money/,cnn.com/business,gizmodo.com/tech,apnews.com/business,forbes.com/business/,bloomberg.com,newsweek.com/business,finance.yahoo.com/news/,',
             "pageSize": 3,
@@ -620,6 +715,12 @@ def fetchNews(name):
 if f'{selected_stock}' not in st.session_state.newsdictionary:
     st.session_state.newsdictionary[f'{selected_stock}'] = fetchNews(name)
 
+
+@st.cache_resource
+def sentimentModel():
+    return pipeline("sentiment-analysis")
+
+
 # create dropdowns for each article
 if st.session_state.newsdictionary[f'{selected_stock}']:
     for ar in st.session_state.newsdictionary[f'{selected_stock}']:
@@ -638,7 +739,7 @@ if st.session_state.newsdictionary[f'{selected_stock}']:
                 sentbutton = st.button(label='Generate an analysis...',
                                        key=url)
                 if sentbutton:
-                    sentiment_pipeline = pipeline("sentiment-analysis")
+                    sentiment_pipeline = sentimentModel()
                     # TODO: improve pipeline, and get full article contents
                     sent = sentiment_pipeline(ar['title'])
                     st.text(sent[0]['label'])
