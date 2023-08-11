@@ -15,3 +15,4 @@ langchain[llms]
 pathlib
 uuid
 pysqlite3-binary
+tiktoken
