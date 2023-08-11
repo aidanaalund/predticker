@@ -43,7 +43,6 @@ from bs4 import BeautifulSoup
 __import__('pysqlite3')
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
-
 START = "2016-01-01"
 TODAY = date.today().strftime("%Y-%m-%d")
 YEAR = int(date.today().strftime("%Y"))
