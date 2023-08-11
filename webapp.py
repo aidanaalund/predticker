@@ -1,4 +1,6 @@
 # Streamlit imports
+import sqlite3
+import sys
 import streamlit as st
 from streamlit_extras.badges import badge as badge
 
@@ -36,6 +38,11 @@ import nltk
 import re
 from heapq import nlargest
 from bs4 import BeautifulSoup
+
+# Cloud version only imports
+__import__('pysqlite3')
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 
 START = "2016-01-01"
 TODAY = date.today().strftime("%Y-%m-%d")
