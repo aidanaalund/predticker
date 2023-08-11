@@ -678,7 +678,7 @@ if csr_links:
 
 
 # TODO: determine how to cache embeddings and use hypothetical document embedding.
-@st.cache_data(show_spinner=False)
+# @st.cache_data(show_spinner=False)
 def generateResponse(uploaded_file, openai_api_key, context, query_text, ticker):
     # Load document if file is uploaded
     if uploaded_file and openai_api_key and query_text != '':
