@@ -14,4 +14,4 @@ chromadb
 langchain[llms]
 pathlib
 uuid
-ppysqlite3-binary
+pysqlite3-binary
