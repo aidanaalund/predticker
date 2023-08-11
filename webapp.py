@@ -692,17 +692,17 @@ def generateResponse(uploaded_file, openai_api_key, context, query_text, ticker)
         # Split documents into chunks
         documents = loader.load_and_split()
         # Select embeddings
-        embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
-        # Create a vectorstore from documents
         try:
-            db = Chroma.from_documents(documents, embeddings)
-            # Create retriever interface
-            retriever = db.as_retriever()
-            # Create QA chain
-            qa = RetrievalQA.from_chain_type(llm=OpenAI(
-                openai_api_key=openai_api_key), chain_type='stuff', retriever=retriever)
+            embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
         except:
             st.toast('Invalid OpenAI API Key. :robot_face:')
+        # Create a vectorstore from documents
+        db = Chroma.from_documents(documents, embeddings)
+        # Create retriever interface
+        retriever = db.as_retriever()
+        # Create QA chain
+        qa = RetrievalQA.from_chain_type(llm=OpenAI(
+            openai_api_key=openai_api_key), chain_type='stuff', retriever=retriever)
         # get rid of temporary file path made
         if filepath.is_file():
             filepath.unlink()
