@@ -707,11 +707,12 @@ def generateResponse(uploaded_file, openai_api_key, context, query_text, ticker)
         if filepath.is_file():
             filepath.unlink()
 
+        response = qa.run(fullquery)
+
         if str(ticker) in st.session_state.conversation:
-            return f'Question: {query_text}\n'+'\nAnswer: '+qa.run(
-                fullquery)+f'\n{st.session_state.conversation[ticker]}'
+            return f'Question: {query_text}\n'+'\nAnswer: '+response+f'\n{st.session_state.conversation[ticker]}'
         else:
-            return f'\nQuestion: {query_text}\n'+'\nAnswer: '+qa.run(fullquery)
+            return f'\nQuestion: {query_text}\n'+'\nAnswer: '+response
     else:
         st.toast('Please fill out the entire form before submitting.')
 
