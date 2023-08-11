@@ -5,11 +5,12 @@ yfinance
 plotly
 numpy
 scikit-learn
-tensorflow
-keras-tuner
 transformers
 nltk
 newspaper3k
 newsapi
-PyPDF2
 pdfplumber
+chromadb
+langchain[llms]
+pathlib
+uuid

@@ -14,10 +14,18 @@ from collections import deque
 from datetime import datetime
 import datetime
 
-# PDF imports
+# PDF/OpenAI imports
 import pdfplumber
-from PyPDF2 import PdfReader
 import io
+import pathlib
+import uuid
+from langchain.document_loaders import PDFPlumberLoader
+from langchain.llms import OpenAI
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.vectorstores import Chroma
+from langchain.chains import RetrievalQA
+
 
 # News/NLP imports
 from transformers import pipeline
@@ -70,11 +78,11 @@ if 'fileuploader' not in st.session_state:
     st.session_state.fileuploader = None
 if 'pdftext' not in st.session_state:
     st.session_state.pdftext = None
+if 'conversation' not in st.session_state:
+    st.session_state.conversation = {}
 
 # User Input
 col1, col2, col3 = st.columns([4, 3, 3])
-# with bird:
-#     st.title(':parrot:')
 with col1:
     st.title(":parrot: ESGParrot")
     st.caption("An ESG-focused stock dashboard")
@@ -552,7 +560,7 @@ if 'message' not in json:
         # st.text('')
         value = json['totalEsg']['fmt']
         st.metric(label='Overall ESG Risk', value=value, delta=None,
-                  help='Overall risk is calculated by adding each individual risk score.')
+                  help='Overall risk is calculated by adding each individual risk score. Higher ESG scores are generally related to higher valuation and less volatility.')
         tier = float(value)
         tierstring = 'bug!'
         if tier > 0 and tier < 10:
@@ -603,16 +611,16 @@ st.text_area('Topic model a sustainability report/blurb:',
              key='report_input',
              on_change=analysis,
              )
+
 if f'{selected_stock}' in st.session_state.esgdictionary:
-    st.caption('Strongest Topic:')
     response = st.session_state.esgdictionary[f'{selected_stock}']
-    print(response)
-    st.caption(response[0]['label'].replace(
-        '_', ' ')+' ('+str(round(response[0]['score']*100, 3))+'%)')
+    topic = response[0]['label'].replace(
+        '_', ' ')
+    st.caption('Strongest Topic: '+topic)
 
 
 @st.cache_data(show_spinner=False)
-def find_csr_links(company_name):
+def findCsrLinks(company_name):
     # Construct the search query using the company name and keywords
     search_query = f"{company_name}"
 
@@ -644,76 +652,145 @@ def find_csr_links(company_name):
 
 
 company_name = f"{name} CSR Report"
-csr_links = find_csr_links(company_name)
+csr_links = findCsrLinks(company_name)
 if csr_links:
     st.subheader('Found Impact Reporting:')
     st.caption(csr_links[7:])
 
-# uploader, button = st.columns([3, 1])
 
+# CHATBOT SECTION
 
-# with uploader:
-#     file = st.file_uploader(label='Analyze an impact report:',
-#                             type=['pdf'], help='PDF only.')
-
-
+# Left in for future tuning of .pdf reading
 # @st.cache_data
 # def parse():
-#     if file:
-#         path = file.read()
-#         with io.BytesIO(path) as open_pdf_file:
-#             reader = PdfReader(open_pdf_file)
-#             num_pages = len(reader.pages)
-#             st.session_state.pdftext = num_pages
+#     if file is not None:
+#         data = []
+#         tables = []
+#         with pdfplumber.open(file) as pdf:
+#             pages = pdf.pages
+#             # st.session_state.pdftext = len(pdf.pages)
+#             # for p in pages:
+#             #     data.append(p.extract_text())
+#             # tables are returned as a list
+#             # test for tesla 2021 report
+#             # table = pages[67].extract_table()
+#         st.session_state.pdftext = len(pages)
 
 
-# with button:
-#     st.text('')
-#     st.text('')
-#     st.button('Parse file (may take a while!)', on_click=parse)
+# TODO: determine how to cache embeddings and use hypothetical document embedding.
+@st.cache_data(show_spinner=False)
+def generateResponse(uploaded_file, openai_api_key, context, query_text, ticker):
+    # Load document if file is uploaded
+    if uploaded_file and openai_api_key and query_text != '':
+        # create virtual file path for Langchain pdf reader interface
+        filepath = pathlib.Path(str(uuid.uuid4()))
+        filepath.write_bytes(uploaded_file.getvalue())
 
-# if st.session_state.pdftext:
-#     st.caption(st.session_state.pdftext)
+        fullquery = context+f'\n{query_text}'
+
+        loader = PDFPlumberLoader(str(filepath))
+        # Split documents into chunks
+        documents = loader.load_and_split()
+        # Select embeddings
+        embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
+        # Create a vectorstore from documents
+        try:
+            db = Chroma.from_documents(documents, embeddings)
+            # Create retriever interface
+            retriever = db.as_retriever()
+            # Create QA chain
+            qa = RetrievalQA.from_chain_type(llm=OpenAI(
+                openai_api_key=openai_api_key), chain_type='stuff', retriever=retriever)
+        except:
+            st.toast('Invalid OpenAI API Key. :robot_face:')
+        # get rid of temporary file path made
+        if filepath.is_file():
+            filepath.unlink()
+
+        if str(ticker) in st.session_state.conversation:
+            return f'Question: {query_text}\n'+'\nAnswer: '+qa.run(
+                fullquery)+f'\n{st.session_state.conversation[ticker]}'
+        else:
+            return f'\nQuestion: {query_text}\n'+'\nAnswer: '+qa.run(
+                fullquery)
+    else:
+        st.toast('Please fill out the entire form before submitting.')
+
+
+with st.form('form'):
+    st.write('Ask questions about an ESG document (EXPERIMENTAL):')
+    # the uploaded file is a BytesIO class
+    file = st.file_uploader(label='Upload file:',
+                            type=['pdf'], help='PDF only.')
+    query = st.text_area(
+        'Question:', value="What is the company doing to reduce carbon emissions? Where could they improve?", help="LLMs may use harmful biases from training. Chatbot does not currently remember previous queries.")
+    key = st.text_input('Enter your OpenAI API Key:',
+                        type='password', help="Please refer to OpenAI's website for pricing info.")
+    # the submit button will update all of the values inside the form all at once!
+    context = """Answer the question truthfully based on the text below. 
+    First answer the question, then include a verbatim quote with quote marks 
+    supporting your answer and a comment where to find it in the text (page number).
+    After the quote write a step by step explanation. Use bullet points."""
+
+    submit = st.form_submit_button("Get an answer")
+    if submit:
+        st.session_state.conversation[selected_stock] = generateResponse(
+            file, key, context, query, str(selected_stock))
+
+    if str(selected_stock) in st.session_state.conversation:
+        st.caption(st.session_state.conversation[str(selected_stock)])
+
 
 st.divider()
 
 # News Section:
 st.subheader('Recent News:')
-# TODO: make error message display properly. AKA, add an 'error' message to the dictionary entry for that company if it fails.
 
 
-# @st.cache_data(show_spinner=False)
-def fetchNews(name):
+@st.cache_data(show_spinner=False)
+def fetchNews(name, endpoint):
     try:
-        # TODO: query results in good articles, but further tuning may be needed
+        # TODO: make query parameter only get articles 'about' a company
 
         query_params = {
             'q': f'{name}',
             "sortBy": "relevancy",
             "apiKey": st.secrets["newsapikey"],
             "page": 1,
-            "excludeDomains": "readwrite.com",
-            # "sources": "reuters,cbs-news,the-washington-post,the-wall-street-journal,financial-times",
-            # "domains": 'cnbc.com/business,usatoday.com/money/,cnn.com/business,gizmodo.com/tech,apnews.com/business,forbes.com/business/,bloomberg.com,newsweek.com/business,finance.yahoo.com/news/,',
             "pageSize": 3,
-            "language": "en"
+            "language": "en",
+            # can't mix sources with category
+            # "sources": "reuters,cbs-news,the-washington-post,the-wall-street-journal,financial-times",
+            # args for 'everything' endpoint only
+            # "excludeDomains": "readwrite.com",
+            # "domains": 'cnbc.com/business,usatoday.com/money/,cnn.com/business,gizmodo.com/tech,apnews.com/business,forbes.com/business/,bloomberg.com,newsweek.com/business,finance.yahoo.com/news/,',
+            # args for top-headlines endpoint only
+            # "category": "business"
         }
-        main_url = "https://newsapi.org/v2/everything"
+        if endpoint == "https://newsapi.org/v2/top-headlines":
+            query_params["category"] = "business"
+        else:
+            query_params["excludeDomains"] = "readwrite.com"
+
+        main_url = endpoint
 
         # fetching data in json format
         res = requests.get(main_url, params=query_params)
         response = res.json()
 
         # getting all articles
-        articles = response["articles"]
+        return response
 
-        return articles
     except:
         st.error("News search failed.")
 
 
 if f'{selected_stock}' not in st.session_state.newsdictionary:
-    st.session_state.newsdictionary[f'{selected_stock}'] = fetchNews(name)
+    st.session_state.newsdictionary[f'{selected_stock}'] = fetchNews(
+        name, "https://newsapi.org/v2/top-headlines")
+    if st.session_state.newsdictionary[f'{selected_stock}']['totalResults'] == 0:
+        st.session_state.newsdictionary[f'{selected_stock}'] = fetchNews(
+            name, "https://newsapi.org/v2/everything")
 
 
 @st.cache_resource
@@ -722,8 +799,8 @@ def sentimentModel():
 
 
 # create dropdowns for each article
-if st.session_state.newsdictionary[f'{selected_stock}']:
-    for ar in st.session_state.newsdictionary[f'{selected_stock}']:
+if st.session_state.newsdictionary[f'{selected_stock}']['totalResults'] > 0:
+    for ar in st.session_state.newsdictionary[f'{selected_stock}']['articles']:
         try:
             with st.expander(ar['title']):
                 url = ar["url"]
@@ -765,18 +842,18 @@ volumecheck = st.checkbox(label="Display volume plot",
 st.divider()
 
 # Credits/Links
-badge(type="github", name="aidanaalund/predticker")
-url = "https://www.streamlit.io"
-st.caption('Made with [Streamlit](%s)' % url)
+# badge(type="github", name="aidanaalund/predticker")
+# url = "https://www.streamlit.io"
+# st.caption('Made with [Streamlit](%s)' % url)
 
 
-# HTML to hide the default 'Made with streamlit' text
-hide_menu = """
-<style>
-footer{
-    visibility:hidden;
-}
-<style>
-"""
+# # HTML to hide the default 'Made with streamlit' text
+# hide_menu = """
+# <style>
+# footer{
+#     visibility:hidden;
+# }
+# <style>
+# """
 
-st.markdown(hide_menu, unsafe_allow_html=True)
+# st.markdown(hide_menu, unsafe_allow_html=True)
