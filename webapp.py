@@ -711,8 +711,7 @@ def generateResponse(uploaded_file, openai_api_key, context, query_text, ticker)
             return f'Question: {query_text}\n'+'\nAnswer: '+qa.run(
                 fullquery)+f'\n{st.session_state.conversation[ticker]}'
         else:
-            return f'\nQuestion: {query_text}\n'+'\nAnswer: '+qa.run(
-                fullquery)
+            return f'\nQuestion: {query_text}\n'+'\nAnswer: '+qa.run(fullquery)
     else:
         st.toast('Please fill out the entire form before submitting.')
 
