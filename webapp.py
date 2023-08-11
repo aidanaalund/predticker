@@ -696,6 +696,7 @@ def generateResponse(uploaded_file, openai_api_key, context, query_text, ticker)
             embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
         except:
             st.toast('Invalid OpenAI API Key. :robot_face:')
+            return ''
         # Create a vectorstore from documents
         db = Chroma.from_documents(documents, embeddings)
         # Create retriever interface
