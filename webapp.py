@@ -1,47 +1,44 @@
 # Streamlit imports
-import sqlite3
-import sys
-import streamlit as st
+from bs4 import BeautifulSoup
+from heapq import nlargest
+import re
+import nltk
+import newsapi
+from newspaper import Article
+import json
+from transformers import pipeline
+from langchain.chains import RetrievalQA
+from langchain.vectorstores import Chroma
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.llms import OpenAI
+from langchain.document_loaders import PDFPlumberLoader
+import uuid
+import pathlib
+import io
+import pdfplumber
+import datetime
+from datetime import datetime
+from collections import deque
+from datetime import date
+import numpy as np
+from plotly import graph_objs as go
+import yfinance as yf
+import requests
+import pandas_ta as ta
+import pandas as pd
 from streamlit_extras.badges import badge as badge
+import streamlit as st
+import sys
+__import__('pysqlite3')
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 # Data scraping/visualization
-import pandas as pd
-import pandas_ta as ta
-import requests
-import yfinance as yf
-from plotly import graph_objs as go
-import numpy as np
-from datetime import date
-from collections import deque
-from datetime import datetime
-import datetime
 
 # PDF/OpenAI imports
-import pdfplumber
-import io
-import pathlib
-import uuid
-from langchain.document_loaders import PDFPlumberLoader
-from langchain.llms import OpenAI
-from langchain.text_splitter import CharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import Chroma
-from langchain.chains import RetrievalQA
 
 
 # News/NLP imports
-from transformers import pipeline
-import json
-from newspaper import Article
-import newsapi
-import nltk
-import re
-from heapq import nlargest
-from bs4 import BeautifulSoup
-
-# Cloud version only imports
-__import__('pysqlite3')
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 START = "2016-01-01"
 TODAY = date.today().strftime("%Y-%m-%d")
@@ -701,8 +698,8 @@ def generateResponse(uploaded_file, openai_api_key, context, query_text, ticker)
         try:
             embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
         except:
-            st.toast('Invalid OpenAI API Key. :robot_face:')
-            return ''
+            st.toast('Monthly Free API limit reached. :robot_face:')
+            return st.session_state.conversation[ticker]
         # Create a vectorstore from documents
         db = Chroma.from_documents(documents, embeddings)
         # Create retriever interface
@@ -731,8 +728,9 @@ with st.form('form'):
                             type=['pdf'], help='PDF only.')
     query = st.text_area(
         'Question:', value="What is the company doing to reduce carbon emissions? Where could they improve?", help="LLMs may use harmful biases from training. Chatbot does not currently remember previous queries.")
-    key = st.text_input('Enter your OpenAI API Key:',
-                        type='password', help="Please refer to OpenAI's website for pricing info.")
+    # key = st.text_input('Enter your OpenAI API Key:',
+    #                     type='password', help="Please refer to OpenAI's website for pricing info.")
+    key = st.secrets['openapikey']
     # the submit button will update all of the values inside the form all at once!
     context = """Answer the question truthfully based on the text below. 
     First answer the question, then include a verbatim quote with quote marks 
