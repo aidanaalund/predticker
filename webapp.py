@@ -745,7 +745,7 @@ with st.form('form'):
     if str(selected_stock) in st.session_state.conversation:
         st.caption(st.session_state.conversation[str(selected_stock)])
 
-st.info('Due to free OpenAI API access, ChatESG is designed to only handle 4 requests with a free API key.')
+# st.info('Due to free OpenAI API access, ChatESG is designed to only handle 4 requests with a free API key.')
 
 st.divider()
 
