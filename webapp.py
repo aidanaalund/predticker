@@ -18,7 +18,7 @@ import pathlib
 import io
 import pdfplumber
 import datetime
-from datetime import datetime
+import datetime
 from collections import deque
 from datetime import date
 import numpy as np
@@ -722,7 +722,7 @@ def generateResponse(uploaded_file, openai_api_key, context, query_text, ticker)
 
 
 with st.form('form'):
-    st.write('Ask questions about an ESG document (EXPERIMENTAL):')
+    st.write('ChatESG (talk to an LLM that understands an ESG document!):')
     # the uploaded file is a BytesIO class
     file = st.file_uploader(label='Upload file:',
                             type=['pdf'], help='PDF only.')
@@ -745,6 +745,7 @@ with st.form('form'):
     if str(selected_stock) in st.session_state.conversation:
         st.caption(st.session_state.conversation[str(selected_stock)])
 
+st.info('Due to free OpenAI API access, ChatESG is designed to only handle 4 requests with a free API key.')
 
 st.divider()
 
