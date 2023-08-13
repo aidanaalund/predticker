@@ -36,8 +36,8 @@ import pandas as pd
 from streamlit_extras.badges import badge as badge
 import streamlit as st
 import sys
-# __import__('pysqlite3')
-# sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+__import__('pysqlite3')
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 START = "2016-01-01"
 TODAY = date.today().strftime("%Y-%m-%d")
@@ -664,9 +664,10 @@ First answer the question, then include a verbatim quote with quote marks
 supporting your answer and a comment where to find it in the text (page number).
 After the quote write a summary that explains your answer. Use bullet points."""
 
-
-st.subheader('ChatESG :speaking_head_in_silhouette::')
-st.caption('Talk to an LLM that understands ESG documents')
+# one, two = st.columns([2, 2])
+# with one:
+st.subheader(
+    'ChatESG :speaking_head_in_silhouette:: an LLM that understands ESG documents')
 esgfile = st.file_uploader(label='Upload CSR report:',
                            type=['pdf'], help='PDF only.')
 # st.info('Due to free OpenAI API access, ChatESG is designed to only handle 4 requests with a free API key.')
@@ -824,16 +825,15 @@ else:
 
 # Extras + Debug Menu
 st.divider()
-st.subheader('Extras:')
-with st.expander(f"{selected_stock}'s Dataframe"):
+with st.expander('Extras & Settings Menu:'):
+    st.caption(f"{name}'s dataframe:")
     st.dataframe(data=st.session_state.currentdataframe,
                  use_container_width=True)
-st.caption('ChatESG Settings:')
-userkey = st.text_input('Use your own OpenAI API Key:',
-                        type='password', help="Please refer to OpenAI's website for pricing info.", key='userkey')
-st.caption('Graph display settings:')
-bbandcheck = st.checkbox(label="Display Bollinger bands",
-                         key='bbandcheck')
-volumecheck = st.checkbox(label="Display volume plot",
-                          key='volumecheck')
-st.divider()
+    st.caption('ChatESG Settings:')
+    userkey = st.text_input('Use your own OpenAI API Key:',
+                            type='password', help="Please refer to OpenAI's website for pricing info.", key='userkey')
+    st.caption('Graph display settings:')
+    bbandcheck = st.checkbox(label="Display Bollinger bands",
+                             key='bbandcheck')
+    volumecheck = st.checkbox(label="Display volume plot",
+                              key='volumecheck')
