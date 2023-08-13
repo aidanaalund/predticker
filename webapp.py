@@ -36,8 +36,8 @@ import pandas as pd
 from streamlit_extras.badges import badge as badge
 import streamlit as st
 import sys
-__import__('pysqlite3')
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+# __import__('pysqlite3')
+# sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 START = "2016-01-01"
 TODAY = date.today().strftime("%Y-%m-%d")
@@ -623,7 +623,7 @@ def generateResponse(uploaded_file, openai_api_key, context, query_text, ticker)
             qacontext = """Answer the question truthfully based on the text below. If
             the question does not seem to be related to sustainability or ESG 
             (Environmental, Social, and Governance) topics, do not answer the question and 
-            state that you are not supposed to answer off topic questions . """
+            state that you are not supposed to answer off topic questions."""
             fullquery = qacontext+f'\n{query_text}'
             response = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
@@ -631,11 +631,17 @@ def generateResponse(uploaded_file, openai_api_key, context, query_text, ticker)
                     {"role": "user", "content": f"{fullquery}"},
                 ]
             )
-
-            st.session_state.conversation[ticker].append(query_text)
-            st.session_state.conversation[ticker].append(
-                response['choices'][0]['message']['content'])
-            return response['choices'][0]['message']['content']
+            if str(ticker) in st.session_state.conversation:
+                st.session_state.conversation[ticker].append(query_text)
+                st.session_state.conversation[ticker].append(
+                    response['choices'][0]['message']['content'])
+                return response['choices'][0]['message']['content']
+            else:
+                st.session_state.conversation[ticker] = []
+                st.session_state.conversation[ticker].append(query_text)
+                st.session_state.conversation[ticker].append(
+                    response['choices'][0]['message']['content'])
+                return response['choices'][0]['message']['content']
         except:
             return None
 
@@ -703,6 +709,7 @@ if input:
         with st.chat_message(name="ChatESG", avatar="assistant"):
             with st.spinner(text='Generating Response'):
                 if st.session_state.userkey == '':
+                    print('normal!')
                     msg = generateResponse(esgfile, key, context,
                                            input, selected_stock)
                 else:
