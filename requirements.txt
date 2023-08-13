@@ -16,3 +16,4 @@ pathlib
 uuid
 pysqlite3-binary
 tiktoken
+openai

@@ -6,6 +6,7 @@ import nltk
 import newsapi
 from newspaper import Article
 import json
+import openai
 from transformers import pipeline
 from langchain.chains import RetrievalQA
 from langchain.vectorstores import Chroma
@@ -13,6 +14,11 @@ from langchain.embeddings import OpenAIEmbeddings
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.llms import OpenAI
 from langchain.document_loaders import PDFPlumberLoader
+from langchain.schema import (
+    AIMessage,
+    HumanMessage,
+    SystemMessage
+)
 import uuid
 import pathlib
 import io
@@ -50,7 +56,7 @@ st.set_page_config(page_title='ESGParrot', page_icon=':parrot:', layout="centere
                    initial_sidebar_state="auto", menu_items={
                        'Get Help': 'https://github.com/aidanaalund/predticker',
                        'Report a bug': "https://github.com/aidanaalund/predticker",
-                       'About': "A stock dashboard with a focus on ESG ratings and NLP analysis of recent news. Data fetched may not be accurate/up to date and this is not financial advice. Powered by Yahoo! Finance and NewsAPI."
+                       'About': "A stock dashboard with a focus on ESG ratings and analysis using NLP/LLM tools. Powered by NewsAPI, Yahoo! Finance, and OpenAI."
                    })
 
 # Initialize session state keys
@@ -83,7 +89,8 @@ if 'pdftext' not in st.session_state:
     st.session_state.pdftext = None
 if 'conversation' not in st.session_state:
     st.session_state.conversation = {}
-
+if 'apicounter' not in st.session_state:
+    st.session_state.apicounter = 0
 # User Input
 col1, col2, col3 = st.columns([4, 3, 3])
 with col1:
@@ -104,7 +111,7 @@ def addstock():
             st.session_state.stocks.add(st.session_state.textinput)
             st.session_state.selectbox = st.session_state.textinput
         except IndexError:
-            st.toast(
+            st.error(
                 body=f'Error: "{st.session_state.textinput}" is an invalid ticker.',
                 icon='🚩')
             st.session_state.textinput = ''
@@ -244,7 +251,7 @@ with header:
               ' ({:0.2f}'.format(percentage)+'%) today'
               )
     recentclose = data['Date'].iloc[-1].strftime('%Y-%m-%d')
-    st.caption(f'Closed: {recentclose}')
+    st.caption(f'as of {recentclose}')
     st.markdown("""
         <style>
         [data-testid=column]:nth-of-type(1) [data-testid=stVerticalBlock]{
@@ -416,96 +423,10 @@ elif rangebutton == 'Max':
         st.plotly_chart(fig2, use_container_width=True)
 
 
-# # Label a company
-
-# # insurance_keywords = ['actuary', 'claims', 'coverage', 'deductible', 'policyholder', 'premium', 'underwriter', 'risk assessment', 'insurable interest', 'loss ratio', 'reinsurance', 'actuarial tables', 'property damage', 'liability', 'flood insurance', 'term life insurance', 'whole life insurance', 'health insurance', 'auto insurance', 'homeowners insurance', 'marine insurance', 'crop insurance', 'catastrophe insurance', 'umbrella insurance',
-# #                       'pet insurance', 'travel insurance', 'professional liability insurance', 'disability insurance', 'long-term care insurance', 'annuity', 'pension plan', 'group insurance', 'insurtech', 'insured', 'insurer', 'subrogation', 'adjuster', 'third-party administrator', 'excess and surplus lines', 'captives', 'workers compensation', 'insurance fraud', 'health savings account', 'health maintenance organization', 'preferred provider organization']
-
-# finance_keywords = ['asset', 'liability', 'equity', 'capital', 'portfolio', 'dividend', 'financial statement', 'balance sheet', 'income statement', 'cash flow statement', 'statement of retained earnings', 'financial ratio', 'valuation', 'bond', 'stock', 'mutual fund', 'exchange-traded fund', 'hedge fund', 'private equity', 'venture capital', 'mergers and acquisitions', 'initial public offering', 'secondary market',
-#                     'primary market', 'securities', 'derivative', 'option', 'futures', 'forward contract', 'swaps', 'commodities', 'credit rating', 'credit score', 'credit report', 'credit bureau', 'credit history', 'credit limit', 'credit utilization', 'credit counseling', 'credit card', 'debit card', 'ATM', 'bankruptcy', 'foreclosure', 'debt consolidation', 'taxes', 'tax return', 'tax deduction', 'tax credit', 'tax bracket', 'taxable income']
-
-# # banking_capital_markets_keywords = ['bank', 'credit union', 'savings and loan association', 'commercial bank', 'investment bank', 'retail bank', 'wholesale bank', 'online bank', 'mobile banking', 'checking account', 'savings account', 'money market account', 'certificate of deposit', 'loan', 'mortgage', 'home equity loan', 'line of credit', 'credit card', 'debit card', 'ATM', 'automated clearing house', 'wire transfer', 'ACH',
-# #                                     'SWIFT', 'international banking', 'foreign exchange', 'forex', 'currency exchange', 'central bank', 'Federal Reserve', 'interest rate', 'inflation', 'deflation', 'monetary policy', 'fiscal policy', 'quantitative easing', 'securities', 'stock', 'bond', 'mutual fund', 'exchange-traded fund', 'hedge fund', 'private equity', 'venture capital', 'investment management', 'portfolio management', 'wealth management', 'financial planning']
-
-# healthcare_life_sciences_keywords = ['medical', 'pharmaceutical', 'pharmaceuticals', 'biotechnology', 'clinical trial', 'FDA', 'healthcare provider', 'healthcare plan', 'healthcare insurance', 'patient', 'doctor', 'nurse', 'pharmacist', 'hospital', 'clinic',
-#                                      'healthcare system', 'healthcare policy', 'public health', 'healthcare IT', 'electronic health record', 'telemedicine', 'personalized medicine', 'genomics', 'proteomics', 'clinical research', 'drug development', 'drug discovery', 'medicine', 'health']
-
-# law_keywords = ['law', 'legal', 'attorney', 'lawyer', 'litigation', 'arbitration', 'dispute resolution', 'contract law', 'intellectual property',
-#                 'corporate law', 'labor law', 'tax law', 'real estate law', 'environmental law', 'criminal law', 'family law', 'immigration law', 'bankruptcy law']
-
-# # sports_keywords = ['sports', 'football', 'basketball', 'baseball', 'hockey', 'soccer', 'golf', 'tennis', 'olympics', 'athletics',
-# #                    'coaching', 'sports management', 'sports medicine', 'sports psychology', 'sports broadcasting', 'sports journalism', 'esports', 'fitness']
-
-# media_keywords = ['media', 'entertainment', 'film', 'television', 'radio', 'music', 'news', 'journalism', 'publishing', 'public relations',
-#                   'advertising', 'marketing', 'social media', 'digital media', 'animation', 'graphic design', 'web design', 'video production']
-
-# manufacturing_keywords = ['manufacturing', 'production', 'assembly', 'logistics', 'supply chain', 'quality control', 'lean manufacturing', 'six sigma', 'industrial engineering',
-#                           'process improvement', 'machinery', 'automation', 'aerospace', 'automotive', 'chemicals', 'construction materials', 'consumer goods', 'electronics', 'semiconductors']
-
-# automotive_keywords = ['automotive', 'cars', 'trucks', 'SUVs', 'electric vehicles', 'hybrid vehicles', 'autonomous vehicles', 'car manufacturing',
-#                        'automotive design', 'car dealerships', 'auto parts', 'vehicle maintenance', 'car rental', 'fleet management', 'telematics']
-
-# telecom_keywords = ['telecom', 'telecommunications', 'wireless', 'networks', 'internet', 'broadband', 'fiber optics', '5G', 'telecom infrastructure',
-#                     'telecom equipment', 'VoIP', 'satellite communications', 'mobile devices', 'smartphones', 'telecom services', 'telecom regulation', 'telecom policy']
-# # other categories to add: agriculture, energy, construction
-
-# agriculture_keywords = ['tractors', 'agriculture',
-#                         'harvesters', 'machinery', 'nutrient', 'turf', 'forestry']
-
-# information_technology_keywords = [
-#     "Artificial intelligence", "Machine learning", "Data Science", "Big Data", "Cloud Computing",
-#     "Cybersecurity", "Information security", "Network security", "Blockchain", "Cryptocurrency",
-#     "Internet of things", "IoT", "Web development", "Mobile development", "Frontend development",
-#     "Backend development", "Software engineering", "Software development", "Programming",
-#     "Database", "Data analytics", "Business intelligence", "DevOps", "Agile", "Scrum",
-#     "Product management", "Project management", "IT consulting", "IT service management",
-#     "ERP", "CRM", "SaaS", "PaaS", "IaaS", "Virtualization", "Artificial reality", "AR", "Virtual reality",
-#     "VR", "Gaming", "E-commerce", "Digital marketing", "SEO", "SEM", "Content marketing",
-#     "Social media marketing", "User experience", "UX design", "UI design", "Cloud-native",
-#     "Microservices", "Serverless", "Containerization", "Wearables", "Smartphone", "Cloud", "Electric Vehicles"
-# ]
-
-# industries = {
-#     # 'Insurance': insurance_keywords,
-#     'Finance': finance_keywords,
-#     # 'Banking': banking_capital_markets_keywords,
-#     'Healthcare': healthcare_life_sciences_keywords,
-#     'Legal': law_keywords,
-#     'Agriculture': agriculture_keywords,
-#     # 'Sports': sports_keywords,
-#     'Media': media_keywords,
-#     'Manufacturing': manufacturing_keywords,
-#     'Automotive': automotive_keywords,
-#     'Telecom': telecom_keywords,
-#     'Technology': information_technology_keywords
-# }
-
-
-# def labelCompany(text):
-#     # Count the number of occurrences of each keyword in the text for each industry
-#     counts = {}
-#     for industry, keywords in industries.items():
-#         count = sum([1 for keyword in keywords if re.search(
-#             r"\b{}\b".format(keyword), text, re.IGNORECASE)])
-#         counts[industry] = count
-
-#     # Get the top industries based on their counts
-#     top_industries = nlargest(2, counts, key=counts.get)
-
-#     # # If only one industry was found, return it
-#     # if len(top_industries) == 1:
-#     #     return top_industries[0]
-#     # # If two industries were found, return them both
-#     # else:
-#     return top_industries[0]
-
-
 @st.cache_data(show_spinner=False)
 def fetchInfo(ticker):
     ticker = yf.Ticker(ticker)
     info = ticker.get_info()
-    # for key, item in (info.items()):
-    #     print(key, "\t", item, "\n")
     return info
 
 
@@ -517,23 +438,6 @@ else:
     name = selected_stock
 with st.expander(f"{name}'s summary"):
     if 'longBusinessSummary' in info:
-        # label = labelCompany(info['longBusinessSummary'])
-        # data_df = pd.DataFrame(
-        #     {
-        #         "Tag": [
-        #             label,
-        #         ],
-        #     }
-        # )
-        # st.data_editor(
-        #     data_df,
-        #     column_config={
-        #         "labels": st.column_config.ListColumn(
-        #             "Tags",
-        #             width="medium",
-        #         ),
-        #     },
-        #     hide_index=True,)
         st.caption(info['longBusinessSummary'])
     else:
         st.error(f"{name}'s summary not available")
@@ -560,7 +464,6 @@ if 'message' not in json:
     url = "https://www.sustainalytics.com/corporate-solutions/esg-solutions/esg-risk-ratings"
     o, e, s, g = st.columns([2, 1, 1, 1])
     with o:
-        # st.text('')
         value = json['totalEsg']['fmt']
         st.metric(label='Overall ESG Risk', value=value, delta=None,
                   help='Overall risk is calculated by adding each individual risk score. Higher ESG scores are generally related to higher valuation and less volatility.')
@@ -597,29 +500,29 @@ else:
     st.error(f'Sustainability data is currently not available for {name}')
 
 
-@st.cache_resource
-def esgBert():
-    return pipeline("text-classification", model="nbroad/ESG-BERT")
+# @st.cache_resource
+# def esgBert():
+#     return pipeline("text-classification", model="nbroad/ESG-BERT")
 
 
-def analysis():
-    pipe = esgBert()
-    st.session_state.esgdictionary[f'{selected_stock}'] = pipe(
-        st.session_state.report_input)
+# def analysis():
+#     pipe = esgBert()
+#     st.session_state.esgdictionary[f'{selected_stock}'] = pipe(
+#         st.session_state.report_input)
 
+# BERT TOPIC MODELING
+# st.text_area('Topic model a sustainability report/blurb:',
+#              help='Using ESGBert, top ESG areas in the text are identified. Unexpected behavior will occur if text other than sustainability reports are inputted.',
+#              placeholder='Put report text here...',
+#              key='report_input',
+#              on_change=analysis,
+#              )
 
-st.text_area('Topic model a sustainability report/blurb:',
-             help='Using ESGBert, top ESG areas in the text are identified. Unexpected behavior will occur if text other than sustainability reports are inputted.',
-             placeholder='Put report text here...',
-             key='report_input',
-             on_change=analysis,
-             )
-
-if f'{selected_stock}' in st.session_state.esgdictionary:
-    response = st.session_state.esgdictionary[f'{selected_stock}']
-    topic = response[0]['label'].replace(
-        '_', ' ')
-    st.caption('Strongest Topic: '+topic)
+# if f'{selected_stock}' in st.session_state.esgdictionary:
+#     response = st.session_state.esgdictionary[f'{selected_stock}']
+#     topic = response[0]['label'].replace(
+#         '_', ' ')
+#     st.caption('Strongest Topic: '+topic)
 
 
 @st.cache_data(show_spinner=False)
@@ -657,7 +560,7 @@ def findCsrLinks(company_name):
 company_name = f"{name} CSR Report"
 csr_links = findCsrLinks(company_name)
 if csr_links:
-    st.subheader('Found Impact Reporting:')
+    st.subheader('Found Impact Reporting :page_facing_up::')
     st.caption(csr_links[7:])
 
 
@@ -680,7 +583,7 @@ if csr_links:
 #         st.session_state.pdftext = len(pages)
 
 
-# TODO: determine how to cache embeddings and use hypothetical document embedding.
+# TODO: determine how to cache embeddings and use hypothetical document embedding (HyDE).
 # @st.cache_data(show_spinner=False)
 def generateResponse(uploaded_file, openai_api_key, context, query_text, ticker):
     # Load document if file is uploaded
@@ -697,55 +600,127 @@ def generateResponse(uploaded_file, openai_api_key, context, query_text, ticker)
         # Select embeddings
         try:
             embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
-        except:
-            st.toast('Monthly Free API limit reached. :robot_face:')
-            return st.session_state.conversation[ticker]
-        # Create a vectorstore from documents
-        db = Chroma.from_documents(documents, embeddings)
-        # Create retriever interface
-        retriever = db.as_retriever()
-        # Create QA chain
-        qa = RetrievalQA.from_chain_type(llm=OpenAI(
-            openai_api_key=openai_api_key), chain_type='stuff', retriever=retriever)
-        # get rid of temporary file path made
-        if filepath.is_file():
-            filepath.unlink()
+            # Create a vectorstore from documents
+            db = Chroma.from_documents(documents, embeddings)
+            # Create retriever interface
+            retriever = db.as_retriever()
+            # Create QA chain
+            qa = RetrievalQA.from_chain_type(llm=OpenAI(
+                openai_api_key=openai_api_key), chain_type='stuff', retriever=retriever)
+            # get rid of temporary file path made
+            if filepath.is_file():
+                filepath.unlink()
 
-        response = qa.run(fullquery)
+            response = qa.run(fullquery)
+        except:
+            return None
 
         if str(ticker) in st.session_state.conversation:
-            return f'Question: {query_text}\n'+'\nAnswer: '+response+f'\n{st.session_state.conversation[ticker]}'
+            st.session_state.conversation[ticker].append(query_text)
+            st.session_state.conversation[ticker].append(response)
+            return response
         else:
-            return f'\nQuestion: {query_text}\n'+'\nAnswer: '+response
+            st.session_state.conversation[ticker] = []
+            st.session_state.conversation[ticker].append(query_text)
+            st.session_state.conversation[ticker].append(response)
+            return response
     else:
-        st.toast('Please fill out the entire form before submitting.')
+        try:
+            openai.api_key = openai_api_key
+            qacontext = """Answer the question truthfully based on the text below. If
+            the question does not seem to be related to sustainability or ESG 
+            (Environmental, Social, and Governance) topics, do not answer the question and 
+            state that you are not supposed to answer off topic questions . """
+            fullquery = qacontext+f'\n{query_text}'
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "user", "content": f"{fullquery}"},
+                ]
+            )
+
+            st.session_state.conversation[ticker].append(query_text)
+            st.session_state.conversation[ticker].append(
+                response['choices'][0]['message']['content'])
+            return response['choices'][0]['message']['content']
+        except:
+            return None
 
 
-with st.form('form'):
-    st.write('ChatESG (talk to an LLM that understands an ESG document!):')
-    # the uploaded file is a BytesIO class
-    file = st.file_uploader(label='Upload file:',
-                            type=['pdf'], help='PDF only.')
-    query = st.text_area(
-        'Question:', value="What is the company doing to reduce carbon emissions? Where could they improve?", help="LLMs may use harmful biases from training. Chatbot does not currently remember previous queries.")
-    # key = st.text_input('Enter your OpenAI API Key:',
-    #                     type='password', help="Please refer to OpenAI's website for pricing info.")
-    key = st.secrets['openapikey']
-    # the submit button will update all of the values inside the form all at once!
-    context = """Answer the question truthfully based on the text below. 
-    First answer the question, then include a verbatim quote with quote marks 
-    supporting your answer and a comment where to find it in the text (page number).
-    After the quote write a step by step explanation. Use bullet points."""
+key = st.secrets['openapikey']
+# the submit button will update all of the values inside the form all at once!
+context = """Answer the question truthfully based on the text below. 
+First answer the question, then include a verbatim quote with quote marks 
+supporting your answer and a comment where to find it in the text (page number).
+After the quote write a summary that explains your answer. Use bullet points."""
 
-    submit = st.form_submit_button("Get an answer")
-    if submit:
-        st.session_state.conversation[selected_stock] = generateResponse(
-            file, key, context, query, str(selected_stock))
 
-    if str(selected_stock) in st.session_state.conversation:
-        st.caption(st.session_state.conversation[str(selected_stock)])
+st.subheader('ChatESG :speaking_head_in_silhouette::')
+st.caption('Talk to an LLM that understands ESG documents')
+esgfile = st.file_uploader(label='Upload CSR report:',
+                           type=['pdf'], help='PDF only.')
 
-st.info('Due to free OpenAI API access, ChatESG is designed to only handle 4 requests with a free API key.')
+key = st.secrets['openapikey']
+with st.chat_message(name="ChatESG", avatar='assistant'):
+    st.write(
+        'Hello! To make me work the best, look at my guide!')
+    with st.expander('Usage Guide + Types of questions to ask me!'):
+        st.markdown("""
+        - Guide:
+            - ChatESG has two modes, document analysis and general Q/A.
+            The first mode runs when a document is uploaded, and the second mode
+            runs if no document is submitted when a query is made.
+            - If you query ChatESG with a document, ChatESG will try to find
+            an answer and cite where it found the material.
+            - If ChatESG is in Q/A mode, it will attempt to answer your question.
+            - ChatESG does not currently remember previous inputs. Please account for this
+            when interacting with it!
+            - ChatESG may be incorrect on some issues or say it does not know an answer. 
+            As a language model, it can often have a flawed understanding of topics. Always 
+            verify what it cites and potential biases of the company who wrote the document.
+            - Try to use specific keywords and language.
+        - Question Ideas:
+            - How does [company] plan to reduce their carbon emissions?
+            - What is ESG?
+            - How does [company] utilize diversity, equity, and inclusion in their business?
+            - What is an area [company] can improve on in hitting emissions targets?
+        """)
+
+if selected_stock in st.session_state.conversation:
+    user = True
+    for message in st.session_state.conversation[selected_stock]:
+        if user:
+            with st.chat_message(name='User', avatar='user'):
+                st.write(message)
+            user = False
+        else:
+            with st.chat_message(name="ChatESG", avatar='assistant'):
+                st.write(message)
+            user = True
+
+
+input = st.chat_input(
+    placeholder="Ask a question about ESG or an impact report")
+
+if input:
+    if not st.session_state.apicounter >= 4:
+        with st.chat_message(name='User', avatar='user'):
+            st.write(input)
+        with st.chat_message(name="ChatESG", avatar="assistant"):
+            with st.spinner(text='Generating Response'):
+                if not st.session_state.userkey:
+                    msg = generateResponse(esgfile, key, context,
+                                           input, selected_stock)
+                else:
+                    msg = generateResponse(esgfile, st.session_state.userkey, context,
+                                           input, selected_stock)
+            if msg is not None:
+                st.write(msg)
+            else:
+                st.error(
+                    'Invalid OpenAI API Key. Please enter a valid key or use the community key.')
+    else:
+        st.toast('Reached the maximum queries allowed for one user. Sorry!')
 
 st.divider()
 
@@ -819,7 +794,7 @@ if st.session_state.newsdictionary[f'{selected_stock}']['totalResults'] > 0:
                 stripped = ar['publishedAt'].split("T", 1)[0]
                 st.caption(f"{ar['description']}")
                 # st.caption(f"{fullarticle.text}")
-                sentbutton = st.button(label='Generate an analysis...',
+                sentbutton = st.button(label='Perform sentiment analysis...',
                                        key=url)
                 if sentbutton:
                     sentiment_pipeline = sentimentModel()
@@ -841,25 +816,12 @@ st.subheader('Extras:')
 with st.expander(f"{selected_stock}'s Dataframe"):
     st.dataframe(data=st.session_state.currentdataframe,
                  use_container_width=True)
+st.caption('ChatESG Settings:')
+userkey = st.text_input('Use your own OpenAI API Key:',
+                        type='password', help="Please refer to OpenAI's website for pricing info.", key='userkey')
+st.caption('Graph display settings:')
 bbandcheck = st.checkbox(label="Display Bollinger bands",
                          key='bbandcheck')
 volumecheck = st.checkbox(label="Display volume plot",
                           key='volumecheck')
 st.divider()
-
-# Credits/Links
-# badge(type="github", name="aidanaalund/predticker")
-# url = "https://www.streamlit.io"
-# st.caption('Made with [Streamlit](%s)' % url)
-
-
-# # HTML to hide the default 'Made with streamlit' text
-# hide_menu = """
-# <style>
-# footer{
-#     visibility:hidden;
-# }
-# <style>
-# """
-
-# st.markdown(hide_menu, unsafe_allow_html=True)
