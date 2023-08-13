@@ -1,4 +1,4 @@
-# Streamlit imports
+# imports
 from bs4 import BeautifulSoup
 from heapq import nlargest
 import re
@@ -38,13 +38,6 @@ import streamlit as st
 import sys
 __import__('pysqlite3')
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-
-# Data scraping/visualization
-
-# PDF/OpenAI imports
-
-
-# News/NLP imports
 
 START = "2016-01-01"
 TODAY = date.today().strftime("%Y-%m-%d")
@@ -709,7 +702,7 @@ if input:
             st.write(input)
         with st.chat_message(name="ChatESG", avatar="assistant"):
             with st.spinner(text='Generating Response'):
-                if not st.session_state.userkey:
+                if st.session_state.userkey == '':
                     msg = generateResponse(esgfile, key, context,
                                            input, selected_stock)
                 else:
