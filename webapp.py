@@ -659,6 +659,7 @@ st.subheader('ChatESG :speaking_head_in_silhouette::')
 st.caption('Talk to an LLM that understands ESG documents')
 esgfile = st.file_uploader(label='Upload CSR report:',
                            type=['pdf'], help='PDF only.')
+# st.info('Due to free OpenAI API access, ChatESG is designed to only handle 4 requests with a free API key.')
 
 key = st.secrets['openapikey']
 with st.chat_message(name="ChatESG", avatar='assistant'):
