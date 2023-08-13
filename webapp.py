@@ -88,7 +88,8 @@ if 'apicounter' not in st.session_state:
 col1, col2, col3 = st.columns([4, 3, 3])
 with col1:
     st.title(":parrot: ESGParrot")
-    st.caption("An ESG-focused stock dashboard")
+    st.markdown(
+        "[Prices](#esgparrot) | [Metrics](#esg-statistics) | [ChatESG](#chatesg) | [News](#recent-news)")
 
 
 # Adds an inputted stock string to a list of stocks in the state
@@ -450,7 +451,7 @@ def fetchESG(ticker):
     return response.json()
 
 
-st.subheader(f"{name}'s ESG statistics")
+st.subheader("ESG Statistics:")
 json = fetchESG(selected_stock)
 if 'message' not in json:
     delta = 0
@@ -459,20 +460,29 @@ if 'message' not in json:
     with o:
         value = json['totalEsg']['fmt']
         st.metric(label='Overall ESG Risk', value=value, delta=None,
-                  help='Overall risk is calculated by adding each individual risk score. Higher ESG scores are generally related to higher valuation and less volatility.')
+                  help=f'{json["percentile"]["fmt"]}th percentile in the {json["peerGroup"]} peer group as of {json["ratingMonth"]}/{json["ratingYear"]}.')
         tier = float(value)
         tierstring = 'bug!'
         if tier > 0 and tier < 10:
             tierstring = 'Negligible'
+            st.markdown(
+                f'<h5 style="color:#d9d9d9;font-size:14px;">{"Negligible"}</h5>', unsafe_allow_html=True)
         elif tier >= 10 and tier < 20:
             tierstring = 'Low'
+            st.markdown(
+                f'<h5 style="color:#f4e7cc;font-size:14px;">{"Low"}</h5>', unsafe_allow_html=True)
         elif tier >= 20 and tier < 30:
             tierstring = 'Medium'
+            st.markdown(
+                f'<h5 style="color:#ffdca7;font-size:14px;">{"Medium"}</h5>', unsafe_allow_html=True)
         elif tier >= 30 and tier < 40:
             tierstring = 'High'
+            st.markdown(
+                f'<h5 style="color:#ffc46d;font-size:14px;">{"High"}</h5>', unsafe_allow_html=True)
         elif tier > 40:
             tierstring = 'Severe'
-        st.caption(tierstring)
+            st.markdown(
+                f'<h5 style="color:#f89500;font-size:14px;">{"Severe"}</h5>', unsafe_allow_html=True)
     with e:
         st.metric(label='Environment Risk',
                   value=json['environmentScore']['fmt'], delta=None)
@@ -482,13 +492,14 @@ if 'message' not in json:
     with g:
         st.metric(label='Governance Risk',
                   value=json['governanceScore']['fmt'], delta=None)
-    info, graphic = st.columns([2, 3])
+    graphic, info = st.columns([3, 2])
+    with graphic:
+        st.image(
+            'https://raw.githubusercontent.com/aidanaalund/predticker/main/resources/sustainalytics_system.png')
     with info:
         st.caption(
-            f'{json["percentile"]["fmt"]}th percentile in the {json["peerGroup"]} peer group as of {json["ratingMonth"]}/{json["ratingYear"]}')
-    with graphic:
-        st.image('https://www.sustainalytics.com/images/default-source/default-album/ratings.png?sfvrsn=74f12bcf_9', output_format='PNG')
-    st.caption('[How does this work?](%s)' % url)
+            'Overall risk is calculated by adding each individual risk score. Higher ESG scores are generally related to higher valuation and less volatility. [Learn more](%s)' % url)
+
 else:
     st.error(f'Sustainability data is currently not available for {name}')
 
