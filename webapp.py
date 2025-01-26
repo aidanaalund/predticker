@@ -9,6 +9,10 @@ import json
 import openai
 from transformers import pipeline
 
+import os
+os.environ["STREAMLIT_SUPPRESS_ERRORS"] = "true"
+
+
 try:
     from langchain.chains import RetrievalQA
 except ConfigError:
