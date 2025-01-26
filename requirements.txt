@@ -1,5 +1,6 @@
 streamlit-extras
 pandas
+pydantic = 2.0
 pandas_ta
 yfinance
 plotly
