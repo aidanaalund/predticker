@@ -18,3 +18,4 @@ uuid
 pysqlite3-binary
 tiktoken
 openai
+pydantic==1.8
