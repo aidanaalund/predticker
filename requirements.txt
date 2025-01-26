@@ -11,6 +11,7 @@ newspaper3k
 newsapi
 pdfplumber
 chromadb
+lxml_html_clean
 langchain[llms]
 pathlib
 uuid
