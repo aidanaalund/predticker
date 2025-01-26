@@ -1,6 +1,5 @@
 streamlit-extras
 pandas
-pydantic==2.0
 pandas_ta
 yfinance
 plotly
@@ -13,7 +12,7 @@ newsapi
 pdfplumber
 chromadb
 lxml_html_clean
-langchain[llms]
+langchain
 pathlib
 uuid
 pysqlite3-binary
