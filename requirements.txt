@@ -1,4 +1,5 @@
 streamlit-extras
+pydantic
 pandas
 pandas_ta
 yfinance
