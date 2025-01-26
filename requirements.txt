@@ -12,7 +12,7 @@ newsapi
 pdfplumber
 chromadb
 lxml_html_clean
-langchain
+langchain[llms]
 pathlib
 uuid
 pysqlite3-binary
