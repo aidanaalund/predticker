@@ -8,7 +8,14 @@ from newspaper import Article
 import json
 import openai
 from transformers import pipeline
-from langchain.chains import RetrievalQA
+
+try:
+    from langchain.chains import RetrievalQA
+except ConfigError:
+    # Handle the import issue or mock the loader
+    RetrievalQA = None
+
+#from langchain.chains import RetrievalQA
 from langchain.vectorstores import Chroma
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.text_splitter import CharacterTextSplitter
