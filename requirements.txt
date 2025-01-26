@@ -12,10 +12,9 @@ newsapi
 pdfplumber
 chromadb
 lxml_html_clean
-langchain[llms]==0.0.299
+langchain[llms]<=0.0.299
 pathlib
 uuid
 pysqlite3-binary
 tiktoken
 openai
-pydantic==1.9
