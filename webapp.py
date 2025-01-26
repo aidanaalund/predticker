@@ -9,16 +9,8 @@ import json
 import openai
 from transformers import pipeline
 
-import os
-os.environ["STREAMLIT_SUPPRESS_ERRORS"] = "true"
 
-
-try:
-    from langchain.chains import RetrievalQA
-except ConfigError:
-    # Handle the import issue or mock the loader
-    RetrievalQA = None
-
+from langchain.chains import RetrievalQA
 #from langchain.chains import RetrievalQA
 from langchain.vectorstores import Chroma
 from langchain.embeddings import OpenAIEmbeddings
