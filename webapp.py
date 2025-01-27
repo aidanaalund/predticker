@@ -784,10 +784,10 @@ def fetchNews(name, endpoint):
 
 if f'{selected_stock}' not in st.session_state.newsdictionary:
     st.session_state.newsdictionary[f'{selected_stock}'] = fetchNews(
-        name, "https://newsapi.org/v2/top-headlines")
+        selected_stock, "https://newsapi.org/v2/top-headlines")
     if st.session_state.newsdictionary[f'{selected_stock}']['totalResults'] == 0:
         st.session_state.newsdictionary[f'{selected_stock}'] = fetchNews(
-            name, "https://newsapi.org/v2/everything")
+            selected_stock, "https://newsapi.org/v2/everything")
 
 
 @st.cache_resource
