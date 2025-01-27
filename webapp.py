@@ -156,8 +156,8 @@ def add_indicators(df):
     df['MACDH'] = df.index.map(macdh)
     df['MACDS'] = df.index.map(macds)
     # Bollinger Bands
-    df.ta.bbands(length=20, append=True)
-    ta.bbands(df['Adj Close'], timeperiod=20)
+    # df.ta.bbands(length=20, append=True)
+    # ta.bbands(df['Adj Close'], timeperiod=20)
     # Log return is defined as ln(d2/d1)
     # Starts at day 1
     df.ta.log_return(close=df['Adj Close'], cumulative=True, append=True)
