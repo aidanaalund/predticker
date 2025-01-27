@@ -829,7 +829,7 @@ else:
 # Extras + Debug Menu
 st.divider()
 with st.expander('Extras & Settings Menu:'):
-    st.caption(f"{name}'s dataframe:")
+    st.caption(f"{selected_stock}'s dataframe:")
     st.dataframe(data=st.session_state.currentdataframe,
                  use_container_width=True)
     st.caption('ChatESG Settings:')
