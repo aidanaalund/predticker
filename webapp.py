@@ -504,7 +504,7 @@ if 'message' not in json:
             'Overall risk is calculated by adding each individual risk score. Higher ESG scores are generally related to higher valuation and less volatility. [Learn more](%s)' % url)
 
 else:
-    st.error(f'Sustainability data is currently not available for at this time')
+    st.error(f'Sustainability data is currently not available at this time')
 
 
 # @st.cache_resource
@@ -564,7 +564,7 @@ def findCsrLinks(company_name):
         print("Failed to fetch search results.")
 
 
-company_name = f"{name} CSR Report"
+company_name = f"CSR Report"
 csr_links = findCsrLinks(company_name)
 if csr_links:
     st.subheader('Found Impact Reporting :page_facing_up::')
