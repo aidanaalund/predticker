@@ -38,9 +38,9 @@ import pandas_ta as ta
 import pandas as pd
 from streamlit_extras.badges import badge as badge
 import streamlit as st
-import sys
-__import__('pysqlite3')
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+# import sys
+# __import__('pysqlite3')
+# sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 START = "2016-01-01"
 TODAY = date.today().strftime("%Y-%m-%d")
