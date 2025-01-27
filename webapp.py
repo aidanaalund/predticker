@@ -504,7 +504,7 @@ if 'message' not in json:
             'Overall risk is calculated by adding each individual risk score. Higher ESG scores are generally related to higher valuation and less volatility. [Learn more](%s)' % url)
 
 else:
-    st.error(f'Sustainability data is currently not available for {name}')
+    st.error(f'Sustainability data is currently not available for at this time')
 
 
 # @st.cache_resource
