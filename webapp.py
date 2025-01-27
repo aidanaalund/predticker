@@ -427,17 +427,17 @@ def fetchInfo(ticker):
     return info
 
 
-info = fetchInfo(selected_stock)
-if info:
-    if 'longName' in info:
-        name = info['longName']
-else:
-    name = selected_stock
-with st.expander(f"{name}'s summary"):
-    if 'longBusinessSummary' in info:
-        st.caption(info['longBusinessSummary'])
-    else:
-        st.error(f"{name}'s summary not available")
+# info = fetchInfo(selected_stock)
+# if info:
+#     if 'longName' in info:
+#         name = info['longName']
+# else:
+#     name = selected_stock
+# with st.expander(f"{name}'s summary"):
+#     if 'longBusinessSummary' in info:
+#         st.caption(info['longBusinessSummary'])
+#     else:
+#         st.error(f"{name}'s summary not available")
 
 
 @st.cache_data(show_spinner=False)
