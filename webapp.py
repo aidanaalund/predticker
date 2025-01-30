@@ -1,4 +1,5 @@
 # imports
+import bs4
 from bs4 import BeautifulSoup
 from heapq import nlargest
 import re
